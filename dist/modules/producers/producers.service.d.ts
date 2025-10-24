@@ -1,0 +1,55 @@
+import type { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { Producer } from "./entities/producer.entity";
+import { InputAssignment } from "./entities/input-assignment.entity";
+import { InputAssignmentItem } from "./entities/input-assignment-item.entity";
+import { FruitReception } from "./entities/fruit-reception.entity";
+import { Shipment } from "./entities/shipment.entity";
+import { ProducerAccountMovement } from "./entities/producer-account-movement.entity";
+import type { CreateProducerDto } from "./dto/create-producer.dto";
+import type { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto";
+import type { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto";
+import type { CreateShipmentDto } from "./dto/create-shipment.dto";
+import type { CreatePaymentDto } from "./dto/create-payment.dto";
+import { InventoryService } from "../inventory/inventory.service";
+export declare class ProducersService {
+    private producersRepository;
+    private inputAssignmentsRepository;
+    private inputAssignmentItemsRepository;
+    private fruitReceptionsRepository;
+    private shipmentsRepository;
+    private accountMovementsRepository;
+    private inventoryService;
+    private dataSource;
+    constructor(producersRepository: Repository<Producer>, inputAssignmentsRepository: Repository<InputAssignment>, inputAssignmentItemsRepository: Repository<InputAssignmentItem>, fruitReceptionsRepository: Repository<FruitReception>, shipmentsRepository: Repository<Shipment>, accountMovementsRepository: Repository<ProducerAccountMovement>, inventoryService: InventoryService, dataSource: DataSource);
+    create(createProducerDto: CreateProducerDto): Promise<Producer>;
+    findAll(): Promise<Producer[]>;
+    findOne(id: string): Promise<Producer>;
+    createInputAssignment(dto: CreateInputAssignmentDto): Promise<InputAssignment>;
+    findAllInputAssignments(): Promise<InputAssignment[]>;
+    createFruitReception(dto: CreateFruitReceptionDto): Promise<FruitReception>;
+    findAllFruitReceptions(): Promise<FruitReception[]>;
+    createShipment(dto: CreateShipmentDto): Promise<Shipment>;
+    updateShipmentStatus(id: string, status: 'embarcada' | 'recibida' | 'vendida', salePrice?: number): Promise<Shipment>;
+    findAllShipments(): Promise<Shipment[]>;
+    getAccountStatement(producerId: string): Promise<{
+        movements: {
+            balance: number;
+            id: string;
+            producerId: string;
+            producer: Producer;
+            type: "cargo" | "abono" | "pago";
+            amount: number;
+            referenceType: string;
+            referenceId: string;
+            referenceCode: string;
+            description: string;
+            paymentMethod: string;
+            paymentReference: string;
+            evidenceUrl: string;
+            createdAt: Date;
+        }[];
+        currentBalance: number;
+    }>;
+    createPayment(dto: CreatePaymentDto): Promise<ProducerAccountMovement>;
+}

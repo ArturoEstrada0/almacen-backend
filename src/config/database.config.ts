@@ -15,6 +15,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         return {
           type: 'postgres',
           url: process.env.DATABASE_URL,
+          // Ensure SSL is used in production environments (useful for managed Postgres like Supabase)
+          ssl: process.env.NODE_ENV === 'production' || process.env.DB_FORCE_SSL ? { rejectUnauthorized: false } : false,
           entities: [__dirname + '/../**/*.entity{.ts,.js}'],
           synchronize: process.env.NODE_ENV !== 'production',
           logging: process.env.NODE_ENV === 'development',
