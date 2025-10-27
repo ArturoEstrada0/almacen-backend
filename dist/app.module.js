@@ -37,10 +37,12 @@ exports.AppModule = AppModule = __decorate([
                     const databaseUrl = config.get('DATABASE_URL');
                     const nodeEnv = config.get('NODE_ENV');
                     if (databaseUrl) {
+                        const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl);
+                        const sslEnabled = nodeEnv === 'production' || config.get('DB_FORCE_SSL') || sslRequestedInUrl;
                         return {
                             type: 'postgres',
                             url: databaseUrl,
-                            ssl: nodeEnv === 'production' || config.get('DB_FORCE_SSL') ? { rejectUnauthorized: false } : false,
+                            ssl: sslEnabled ? { rejectUnauthorized: false } : false,
                             autoLoadEntities: true,
                             synchronize: nodeEnv !== 'production',
                             logging: nodeEnv === 'development',

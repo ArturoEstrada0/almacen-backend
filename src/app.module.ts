@@ -28,11 +28,15 @@ import { AuthModule } from "./modules/auth/auth.module"
         const nodeEnv = config.get<string>('NODE_ENV')
 
         if (databaseUrl) {
+          // Detect SSL requirement from either environment or the connection string query
+          const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl)
+          const sslEnabled = nodeEnv === 'production' || config.get('DB_FORCE_SSL') || sslRequestedInUrl
+
           return {
             type: 'postgres',
             url: databaseUrl,
-            // Enable SSL in production or when explicitly forced. Many managed DBs require SSL.
-            ssl: nodeEnv === 'production' || config.get('DB_FORCE_SSL') ? { rejectUnauthorized: false } : false,
+            // Enable SSL when appropriate; many managed DBs require it. Accept self-signed certs by default.
+            ssl: sslEnabled ? { rejectUnauthorized: false } : false,
             autoLoadEntities: true,
             synchronize: nodeEnv !== 'production',
             logging: nodeEnv === 'development',
