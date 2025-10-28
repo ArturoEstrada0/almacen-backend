@@ -33,10 +33,26 @@ async function bootstrap() {
     }),
   )
 
-  // Enable CORS for Next.js frontend
+  // Enable CORS. FRONTEND_URL may contain one or more origins separated by commas.
+  // When credentials are true, Access-Control-Allow-Origin must be a specific origin,
+  // so we implement a small origin-checking function.
+  const rawOrigins = process.env.FRONTEND_URL || 'http://localhost:3000'
+  const allowedOrigins = rawOrigins.split(',').map(s => s.trim()).filter(Boolean)
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow non-browser requests (e.g., curl, Postman) which have no origin
+      if (!origin) return callback(null, true)
+
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+
+      // For debugging, you can log blocked origins here
+      console.warn(`CORS blocked origin: ${origin}`)
+      return callback(new Error('Not allowed by CORS'))
+    },
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   })
 
   // Add global API prefix so frontend can call /api/... endpoints
