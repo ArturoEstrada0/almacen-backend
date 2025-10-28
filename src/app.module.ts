@@ -23,11 +23,9 @@ import { AuthModule } from "./modules/auth/auth.module"
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        // Prefer a full DATABASE_URL if provided (e.g. from Render or managed Postgres providers)
-        // Per user request, fall back to a hardcoded direct Supabase URL when DATABASE_URL is not set.
-        // NOTE: Hardcoding credentials in source is insecure; you asked for this explicitly.
-        const FALLBACK_DATABASE_URL = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require'
-        const databaseUrl = config.get<string>('DATABASE_URL') || FALLBACK_DATABASE_URL
+  // Use hardcoded direct Supabase URL (ignore env vars) as requested.
+  // NOTE: This stores credentials in source code and is insecure for production.
+  const databaseUrl = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require'
         const nodeEnv = config.get<string>('NODE_ENV')
 
         if (databaseUrl) {

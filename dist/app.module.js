@@ -34,8 +34,7 @@ exports.AppModule = AppModule = __decorate([
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
                 useFactory: (config) => {
-                    const FALLBACK_DATABASE_URL = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require';
-                    const databaseUrl = config.get('DATABASE_URL') || FALLBACK_DATABASE_URL;
+                    const databaseUrl = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require';
                     const nodeEnv = config.get('NODE_ENV');
                     if (databaseUrl) {
                         const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl);
