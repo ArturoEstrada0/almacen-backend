@@ -24,13 +24,17 @@ import { AuthModule } from "./modules/auth/auth.module"
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         // Prefer a full DATABASE_URL if provided (e.g. from Render or managed Postgres providers)
-        const databaseUrl = config.get<string>('DATABASE_URL')
+        // Per user request, fall back to a hardcoded direct Supabase URL when DATABASE_URL is not set.
+        // NOTE: Hardcoding credentials in source is insecure; you asked for this explicitly.
+        const FALLBACK_DATABASE_URL = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require'
+        const databaseUrl = config.get<string>('DATABASE_URL') || FALLBACK_DATABASE_URL
         const nodeEnv = config.get<string>('NODE_ENV')
 
         if (databaseUrl) {
           // Detect SSL requirement from either environment or the connection string query
           const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl)
           const sslEnabled = nodeEnv === 'production' || config.get('DB_FORCE_SSL') || sslRequestedInUrl
+          // NOTE: connection info determined from DATABASE_URL (password not logged)
 
           return {
             type: 'postgres',
@@ -51,6 +55,7 @@ import { AuthModule } from "./modules/auth/auth.module"
           username: config.get('DB_USERNAME', 'postgres'),
           password: config.get('DB_PASSWORD', 'postgres'),
           database: config.get('DB_DATABASE', 'almacen'),
+          // no debug logging here
           autoLoadEntities: true,
           synchronize: nodeEnv !== 'production',
           logging: nodeEnv === 'development',
