@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common"
 import { ConfigModule, ConfigService } from "@nestjs/config"
 import { TypeOrmModule } from "@nestjs/typeorm"
 import * as dns from 'dns'
+import * as fs from 'fs'
+import { join } from 'path'
 import { ProductsModule } from "./modules/products/products.module"
 import { CategoriesModule } from "./modules/categories/categories.module"
 import { UnitsModule } from "./modules/units/units.module"
@@ -35,6 +37,21 @@ import { AuthModule } from "./modules/auth/auth.module"
           const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl)
           const sslEnabled = nodeEnv === 'production' || config.get('DB_FORCE_SSL') || sslRequestedInUrl
 
+          // If a CA certificate file is present in the project root, use it to validate the
+          // Postgres server certificate. This allows us to set rejectUnauthorized: true and
+          // avoid disabling certificate verification globally.
+          const certPath = join(process.cwd(), 'prod-ca-2021.crt')
+          const certExists = fs.existsSync(certPath)
+          let caCert: string | undefined
+          if (certExists) {
+            try {
+              caCert = fs.readFileSync(certPath, 'utf8')
+            } catch (e) {
+              // ignore read errors and fall back to not providing a CA
+              caCert = undefined
+            }
+          }
+
           try {
             // Parse the URL to extract host/port/user/db
             const parsed = new URL(databaseUrl)
@@ -51,6 +68,12 @@ import { AuthModule } from "./modules/auth/auth.module"
 
             if (addr && addr.address) {
               // Return explicit host-based options using the resolved IPv4 address.
+              const sslConfig = sslEnabled
+                ? caCert
+                  ? { rejectUnauthorized: true, ca: caCert }
+                  : { rejectUnauthorized: false }
+                : false
+
               return {
                 type: 'postgres',
                 host: addr.address,
@@ -58,7 +81,7 @@ import { AuthModule } from "./modules/auth/auth.module"
                 username,
                 password,
                 database,
-                ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+                ssl: sslConfig,
                 autoLoadEntities: true,
                 synchronize: nodeEnv !== 'production',
                 logging: nodeEnv === 'development',
@@ -66,10 +89,16 @@ import { AuthModule } from "./modules/auth/auth.module"
             }
 
             // If IPv4 resolution failed, fall back to using the full URL (original behavior).
+            const sslConfig = sslEnabled
+              ? caCert
+                ? { rejectUnauthorized: true, ca: caCert }
+                : { rejectUnauthorized: false }
+              : false
+
             return {
               type: 'postgres',
               url: databaseUrl,
-              ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+              ssl: sslConfig,
               autoLoadEntities: true,
               synchronize: nodeEnv !== 'production',
               logging: nodeEnv === 'development',

@@ -10,6 +10,9 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
+const dns = require("dns");
+const fs = require("fs");
+const path_1 = require("path");
 const products_module_1 = require("./modules/products/products.module");
 const categories_module_1 = require("./modules/categories/categories.module");
 const units_module_1 = require("./modules/units/units.module");
@@ -33,20 +36,75 @@ exports.AppModule = AppModule = __decorate([
             typeorm_1.TypeOrmModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
-                useFactory: (config) => {
+                useFactory: async (config) => {
                     const databaseUrl = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require';
                     const nodeEnv = config.get('NODE_ENV');
                     if (databaseUrl) {
                         const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl);
                         const sslEnabled = nodeEnv === 'production' || config.get('DB_FORCE_SSL') || sslRequestedInUrl;
-                        return {
-                            type: 'postgres',
-                            url: databaseUrl,
-                            ssl: sslEnabled ? { rejectUnauthorized: false } : false,
-                            autoLoadEntities: true,
-                            synchronize: nodeEnv !== 'production',
-                            logging: nodeEnv === 'development',
-                        };
+                        const certPath = (0, path_1.join)(process.cwd(), 'prod-ca-2021.crt');
+                        const certExists = fs.existsSync(certPath);
+                        let caCert;
+                        if (certExists) {
+                            try {
+                                caCert = fs.readFileSync(certPath, 'utf8');
+                            }
+                            catch (e) {
+                                caCert = undefined;
+                            }
+                        }
+                        try {
+                            const parsed = new URL(databaseUrl);
+                            const hostname = parsed.hostname;
+                            const port = Number(parsed.port) || 5432;
+                            const username = parsed.username;
+                            const password = parsed.password;
+                            const database = parsed.pathname ? parsed.pathname.replace(/^\//, '') : undefined;
+                            const lookup = dns.promises.lookup;
+                            const addr = await lookup(hostname, { family: 4 }).catch(() => null);
+                            if (addr && addr.address) {
+                                const sslConfig = sslEnabled
+                                    ? caCert
+                                        ? { rejectUnauthorized: true, ca: caCert }
+                                        : { rejectUnauthorized: false }
+                                    : false;
+                                return {
+                                    type: 'postgres',
+                                    host: addr.address,
+                                    port,
+                                    username,
+                                    password,
+                                    database,
+                                    ssl: sslConfig,
+                                    autoLoadEntities: true,
+                                    synchronize: nodeEnv !== 'production',
+                                    logging: nodeEnv === 'development',
+                                };
+                            }
+                            const sslConfig = sslEnabled
+                                ? caCert
+                                    ? { rejectUnauthorized: true, ca: caCert }
+                                    : { rejectUnauthorized: false }
+                                : false;
+                            return {
+                                type: 'postgres',
+                                url: databaseUrl,
+                                ssl: sslConfig,
+                                autoLoadEntities: true,
+                                synchronize: nodeEnv !== 'production',
+                                logging: nodeEnv === 'development',
+                            };
+                        }
+                        catch (err) {
+                            return {
+                                type: 'postgres',
+                                url: databaseUrl,
+                                ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+                                autoLoadEntities: true,
+                                synchronize: nodeEnv !== 'production',
+                                logging: nodeEnv === 'development',
+                            };
+                        }
                     }
                     return {
                         type: 'postgres',
