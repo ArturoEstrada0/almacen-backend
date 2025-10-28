@@ -11,7 +11,7 @@ import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.
 import { ProducersModule } from "./modules/producers/producers.module"
 import { QuotationsModule } from "./modules/quotations/quotations.module"
 import { AuthModule } from "./modules/auth/auth.module"
-import { DatabaseConfig } from "./config/database.config" // This line is redundant and can be removed
+// DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
   imports: [
@@ -22,19 +22,34 @@ import { DatabaseConfig } from "./config/database.config" // This line is redund
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('DB_HOST', 'localhost'),
-        port: Number(config.get('DB_PORT', 5432)),
-        username: config.get('DB_USERNAME', 'postgres'),
-        password: config.get('DB_PASSWORD', 'postgres'),
-        database: config.get('DB_DATABASE', 'almacen'),
-        // Use autoLoadEntities so Nest/TypeORM loads entities registered via forFeature in modules
-        // This avoids TypeORM trying to require .ts files directly in dev mode
-        autoLoadEntities: true,
-        synchronize: config.get('NODE_ENV') !== 'production',
-        logging: config.get('NODE_ENV') === 'development',
-      }),
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL')
+        const isProd = config.get('NODE_ENV') === 'production'
+
+        if (databaseUrl) {
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            // For managed Postgres (Supabase) allow SSL and skip certificate validation
+            ssl: isProd || config.get('DB_FORCE_SSL') ? { rejectUnauthorized: false } : false,
+            autoLoadEntities: true,
+            synchronize: !isProd,
+            logging: !isProd,
+          }
+        }
+
+        return {
+          type: 'postgres',
+          host: config.get('DB_HOST', 'localhost'),
+          port: Number(config.get('DB_PORT') || 5432),
+          username: config.get('DB_USERNAME', 'postgres'),
+          password: config.get('DB_PASSWORD', 'postgres'),
+          database: config.get('DB_DATABASE', 'almacen'),
+          autoLoadEntities: true,
+          synchronize: !isProd,
+          logging: !isProd,
+        }
+      },
     }),
     AuthModule,
     ProductsModule,

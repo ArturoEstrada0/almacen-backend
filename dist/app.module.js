@@ -33,17 +33,31 @@ exports.AppModule = AppModule = __decorate([
             typeorm_1.TypeOrmModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
-                useFactory: (config) => ({
-                    type: 'postgres',
-                    host: config.get('DB_HOST', 'localhost'),
-                    port: Number(config.get('DB_PORT', 5432)),
-                    username: config.get('DB_USERNAME', 'postgres'),
-                    password: config.get('DB_PASSWORD', 'postgres'),
-                    database: config.get('DB_DATABASE', 'almacen'),
-                    autoLoadEntities: true,
-                    synchronize: config.get('NODE_ENV') !== 'production',
-                    logging: config.get('NODE_ENV') === 'development',
-                }),
+                useFactory: (config) => {
+                    const databaseUrl = config.get('DATABASE_URL');
+                    const isProd = config.get('NODE_ENV') === 'production';
+                    if (databaseUrl) {
+                        return {
+                            type: 'postgres',
+                            url: databaseUrl,
+                            ssl: isProd || config.get('DB_FORCE_SSL') ? { rejectUnauthorized: false } : false,
+                            autoLoadEntities: true,
+                            synchronize: !isProd,
+                            logging: !isProd,
+                        };
+                    }
+                    return {
+                        type: 'postgres',
+                        host: config.get('DB_HOST', 'localhost'),
+                        port: Number(config.get('DB_PORT') || 5432),
+                        username: config.get('DB_USERNAME', 'postgres'),
+                        password: config.get('DB_PASSWORD', 'postgres'),
+                        database: config.get('DB_DATABASE', 'almacen'),
+                        autoLoadEntities: true,
+                        synchronize: !isProd,
+                        logging: !isProd,
+                    };
+                },
             }),
             auth_module_1.AuthModule,
             products_module_1.ProductsModule,
