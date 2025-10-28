@@ -1,9 +1,21 @@
 import { NestFactory } from "@nestjs/core"
+import * as dns from 'dns'
 import { ValidationPipe } from "@nestjs/common"
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger"
 import { AppModule } from "./app.module"
 
 async function bootstrap() {
+  // Prefer IPv4 when resolving DNS to avoid environments without IPv6 routing (some hosts like Render)
+  if (typeof dns.setDefaultResultOrder === 'function') {
+    try {
+      dns.setDefaultResultOrder('ipv4first')
+      // eslint-disable-next-line no-console
+      console.log('DNS result order set to ipv4first')
+    } catch (err) {
+      // ignore if not supported
+    }
+  }
+
   const app = await NestFactory.create(AppModule)
 
   // Global validation pipe

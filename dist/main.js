@@ -1,10 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
+const dns = require("dns");
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const app_module_1 = require("./app.module");
 async function bootstrap() {
+    if (typeof dns.setDefaultResultOrder === 'function') {
+        try {
+            dns.setDefaultResultOrder('ipv4first');
+            console.log('DNS result order set to ipv4first');
+        }
+        catch (err) {
+        }
+    }
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
