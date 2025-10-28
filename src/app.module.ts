@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import { ConfigModule, ConfigService } from "@nestjs/config"
 import { TypeOrmModule } from "@nestjs/typeorm"
+import * as dns from 'dns'
 import { ProductsModule } from "./modules/products/products.module"
 import { CategoriesModule } from "./modules/categories/categories.module"
 import { UnitsModule } from "./modules/units/units.module"
@@ -22,7 +23,8 @@ import { AuthModule } from "./modules/auth/auth.module"
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      // Make the factory async so we can resolve the DB host to an IPv4 address before returning options.
+      useFactory: async (config: ConfigService) => {
   // Use hardcoded direct Supabase URL (ignore env vars) as requested.
   // NOTE: This stores credentials in source code and is insecure for production.
   const databaseUrl = 'postgresql://postgres:ItzGivenODST@db.ehpssgacrncyarzxogmv.supabase.co:5432/postgres?sslmode=require'
@@ -32,16 +34,56 @@ import { AuthModule } from "./modules/auth/auth.module"
           // Detect SSL requirement from either environment or the connection string query
           const sslRequestedInUrl = /sslmode=require|ssl=true/i.test(databaseUrl)
           const sslEnabled = nodeEnv === 'production' || config.get('DB_FORCE_SSL') || sslRequestedInUrl
-          // NOTE: connection info determined from DATABASE_URL (password not logged)
 
-          return {
-            type: 'postgres',
-            url: databaseUrl,
-            // Enable SSL when appropriate; many managed DBs require it. Accept self-signed certs by default.
-            ssl: sslEnabled ? { rejectUnauthorized: false } : false,
-            autoLoadEntities: true,
-            synchronize: nodeEnv !== 'production',
-            logging: nodeEnv === 'development',
+          try {
+            // Parse the URL to extract host/port/user/db
+            const parsed = new URL(databaseUrl)
+            const hostname = parsed.hostname
+            const port = Number(parsed.port) || 5432
+            const username = parsed.username
+            const password = parsed.password
+            const database = parsed.pathname ? parsed.pathname.replace(/^\//, '') : undefined
+
+            // Try to resolve IPv4 address for the host. This avoids ENETUNREACH when the platform
+            // returns an IPv6 AAAA record that is not routable from the container.
+            const lookup = dns.promises.lookup
+            const addr = await lookup(hostname, { family: 4 }).catch(() => null)
+
+            if (addr && addr.address) {
+              // Return explicit host-based options using the resolved IPv4 address.
+              return {
+                type: 'postgres',
+                host: addr.address,
+                port,
+                username,
+                password,
+                database,
+                ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+                autoLoadEntities: true,
+                synchronize: nodeEnv !== 'production',
+                logging: nodeEnv === 'development',
+              }
+            }
+
+            // If IPv4 resolution failed, fall back to using the full URL (original behavior).
+            return {
+              type: 'postgres',
+              url: databaseUrl,
+              ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+              autoLoadEntities: true,
+              synchronize: nodeEnv !== 'production',
+              logging: nodeEnv === 'development',
+            }
+          } catch (err) {
+            // On any parsing/lookup error, fall back to URL form to avoid blocking startup.
+            return {
+              type: 'postgres',
+              url: databaseUrl,
+              ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+              autoLoadEntities: true,
+              synchronize: nodeEnv !== 'production',
+              logging: nodeEnv === 'development',
+            }
           }
         }
 
@@ -53,7 +95,6 @@ import { AuthModule } from "./modules/auth/auth.module"
           username: config.get('DB_USERNAME', 'postgres'),
           password: config.get('DB_PASSWORD', 'postgres'),
           database: config.get('DB_DATABASE', 'almacen'),
-          // no debug logging here
           autoLoadEntities: true,
           synchronize: nodeEnv !== 'production',
           logging: nodeEnv === 'development',
