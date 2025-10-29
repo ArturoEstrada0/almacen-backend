@@ -13,6 +13,7 @@ exports.InputAssignment = void 0;
 const typeorm_1 = require("typeorm");
 const producer_entity_1 = require("./producer.entity");
 const input_assignment_item_entity_1 = require("./input-assignment-item.entity");
+const warehouse_entity_1 = require("../../warehouses/entities/warehouse.entity");
 let InputAssignment = class InputAssignment {
 };
 exports.InputAssignment = InputAssignment;
@@ -21,7 +22,7 @@ __decorate([
     __metadata("design:type", String)
 ], InputAssignment.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ unique: true }),
+    (0, typeorm_1.Column)({ name: "assignment_number", unique: true }),
     __metadata("design:type", String)
 ], InputAssignment.prototype, "code", void 0);
 __decorate([
@@ -34,9 +35,18 @@ __decorate([
     __metadata("design:type", producer_entity_1.Producer)
 ], InputAssignment.prototype, "producer", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "date" }),
+    (0, typeorm_1.Column)({ name: "assignment_date", type: "date" }),
     __metadata("design:type", Date)
 ], InputAssignment.prototype, "date", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "warehouse_id", nullable: true }),
+    __metadata("design:type", String)
+], InputAssignment.prototype, "warehouseId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => warehouse_entity_1.Warehouse, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "warehouse_id" }),
+    __metadata("design:type", warehouse_entity_1.Warehouse)
+], InputAssignment.prototype, "warehouse", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2, default: 0 }),
     __metadata("design:type", Number)

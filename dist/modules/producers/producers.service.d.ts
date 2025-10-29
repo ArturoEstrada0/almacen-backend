@@ -22,6 +22,7 @@ export declare class ProducersService {
     private inventoryService;
     private dataSource;
     constructor(producersRepository: Repository<Producer>, inputAssignmentsRepository: Repository<InputAssignment>, inputAssignmentItemsRepository: Repository<InputAssignmentItem>, fruitReceptionsRepository: Repository<FruitReception>, shipmentsRepository: Repository<Shipment>, accountMovementsRepository: Repository<ProducerAccountMovement>, inventoryService: InventoryService, dataSource: DataSource);
+    private generateCode;
     create(createProducerDto: CreateProducerDto): Promise<Producer>;
     findAll(): Promise<Producer[]>;
     findOne(id: string): Promise<Producer>;

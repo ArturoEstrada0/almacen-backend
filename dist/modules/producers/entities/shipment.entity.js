@@ -64,7 +64,7 @@ __decorate([
     __metadata("design:type", String)
 ], Shipment.prototype, "notes", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => fruit_reception_entity_1.FruitReception, (reception) => reception.shipmentId),
+    (0, typeorm_1.OneToMany)(() => fruit_reception_entity_1.FruitReception, (reception) => reception.shipment),
     __metadata("design:type", Array)
 ], Shipment.prototype, "receptions", void 0);
 __decorate([

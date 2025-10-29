@@ -42,7 +42,7 @@ export class Shipment {
 
   @OneToMany(
     () => FruitReception,
-    (reception) => reception.shipmentId,
+    (reception) => reception.shipment,
   )
   receptions: FruitReception[]
 

@@ -43,7 +43,7 @@ __decorate([
     __metadata("design:type", Number)
 ], InputAssignmentItem.prototype, "quantity", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2 }),
+    (0, typeorm_1.Column)({ name: "unit_price", type: "decimal", precision: 10, scale: 2 }),
     __metadata("design:type", Number)
 ], InputAssignmentItem.prototype, "price", void 0);
 __decorate([

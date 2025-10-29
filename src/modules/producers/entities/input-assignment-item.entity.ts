@@ -27,7 +27,7 @@ export class InputAssignmentItem {
   @Column({ type: "decimal", precision: 10, scale: 2 })
   quantity: number
 
-  @Column({ type: "decimal", precision: 10, scale: 2 })
+  @Column({ name: "unit_price", type: "decimal", precision: 10, scale: 2 })
   price: number
 
   @Column({ type: "decimal", precision: 10, scale: 2 })

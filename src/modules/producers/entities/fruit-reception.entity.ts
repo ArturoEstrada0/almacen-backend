@@ -9,6 +9,8 @@ import {
 } from "typeorm"
 import { Producer } from "./producer.entity"
 import { Product } from "../../products/entities/product.entity"
+import { Shipment } from "./shipment.entity"
+import { Warehouse } from "../../warehouses/entities/warehouse.entity"
 
 @Entity("fruit_receptions")
 export class FruitReception {
@@ -32,6 +34,13 @@ export class FruitReception {
   @JoinColumn({ name: "product_id" })
   product: Product
 
+  @Column({ name: "warehouse_id" })
+  warehouseId: string
+
+  @ManyToOne(() => Warehouse)
+  @JoinColumn({ name: "warehouse_id" })
+  warehouse: Warehouse
+
   @Column({ type: "date" })
   date: Date
 
@@ -54,6 +63,10 @@ export class FruitReception {
 
   @Column({ name: "shipment_id", nullable: true })
   shipmentId: string
+
+  @ManyToOne(() => Shipment, (shipment) => shipment.receptions, { nullable: true })
+  @JoinColumn({ name: "shipment_id" })
+  shipment: Shipment
 
   @Column({ name: "price_per_box", type: "decimal", precision: 10, scale: 2, nullable: true })
   pricePerBox: number

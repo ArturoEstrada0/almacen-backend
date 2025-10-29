@@ -10,13 +10,14 @@ import {
 } from "typeorm"
 import { Producer } from "./producer.entity"
 import { InputAssignmentItem } from "./input-assignment-item.entity"
+import { Warehouse } from "../../warehouses/entities/warehouse.entity"
 
 @Entity("input_assignments")
 export class InputAssignment {
   @PrimaryGeneratedColumn("uuid")
   id: string
 
-  @Column({ unique: true })
+  @Column({ name: "assignment_number", unique: true })
   code: string
 
   @Column({ name: "producer_id" })
@@ -26,8 +27,15 @@ export class InputAssignment {
   @JoinColumn({ name: "producer_id" })
   producer: Producer
 
-  @Column({ type: "date" })
+  @Column({ name: "assignment_date", type: "date" })
   date: Date
+
+  @Column({ name: "warehouse_id", nullable: true })
+  warehouseId: string
+
+  @ManyToOne(() => Warehouse, { nullable: true })
+  @JoinColumn({ name: "warehouse_id" })
+  warehouse: Warehouse
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   total: number

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import type { Repository } from "typeorm"
-import { DataSource } from "typeorm"
+import { DataSource, In } from "typeorm"
 import { Producer } from "./entities/producer.entity"
 import { InputAssignment } from "./entities/input-assignment.entity"
 import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
@@ -53,10 +53,21 @@ export class ProducersService {
     this.dataSource = dataSource
   }
 
+  private generateCode(prefix: string) {
+    return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 9000) + 1000}`
+  }
+
   // Producers CRUD
   async create(createProducerDto: CreateProducerDto): Promise<Producer> {
-    const producer = this.producersRepository.create(createProducerDto)
-    return await this.producersRepository.save(producer)
+    // Map taxId -> rfc if provided in DTO
+    const payload: any = { ...createProducerDto }
+    if ((createProducerDto as any).taxId) {
+      payload.rfc = (createProducerDto as any).taxId
+    }
+
+    const producer = this.producersRepository.create(payload)
+    const saved = await this.producersRepository.save(producer as any)
+    return saved as Producer
   }
 
   async findAll(): Promise<Producer[]> {
@@ -88,7 +99,10 @@ export class ProducersService {
       const total = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
 
       const assignment = this.inputAssignmentsRepository.create({
+        code: this.generateCode("IA"),
         producerId: dto.producerId,
+        warehouseId: dto.warehouseId,
+        date: new Date(),
         total,
         notes: dto.notes,
       })
@@ -118,13 +132,23 @@ export class ProducersService {
       })
 
       // Create account movement (debit - producer owes)
+      // compute previous balance
+      const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
+        where: { producerId: dto.producerId },
+        order: { createdAt: "DESC" },
+      })
+      const prevBalance = lastMovement ? Number(lastMovement.balance) : 0
+      const newBalance = prevBalance - Number(total)
+
       const accountMovement = this.accountMovementsRepository.create({
         producerId: dto.producerId,
         type: "cargo",
         amount: total,
+        balance: newBalance,
         description: "Asignación de insumos",
         referenceType: "input_assignment",
         referenceId: assignment.id,
+        referenceCode: assignment.code,
       } as any)
       await queryRunner.manager.save(accountMovement)
 
@@ -143,10 +167,32 @@ export class ProducersService {
   }
 
   async findAllInputAssignments(): Promise<InputAssignment[]> {
-    return await this.inputAssignmentsRepository.find({
-      relations: ["producer", "warehouse", "items", "items.product"],
-      order: { createdAt: "DESC" },
-    })
+    try {
+      return await this.inputAssignmentsRepository.find({
+        relations: ["producer", "warehouse", "items", "items.product"],
+        order: { createdAt: "DESC" },
+      })
+    } catch (error: any) {
+      // If the DB doesn't have the warehouse column, try a fallback without the warehouse relation
+      console.error("Error in findAllInputAssignments:", error)
+
+      // Specific handling for missing column errors coming from Postgres / TypeORM
+      const msg = (error?.message || "").toLowerCase()
+      if (msg.includes('warehouse_id') || msg.includes('does not exist') || error?.code === '42703') {
+        try {
+          console.warn('Falling back to loading input assignments without warehouse relation')
+          return await this.inputAssignmentsRepository.find({
+            relations: ["producer", "items", "items.product"],
+            order: { createdAt: "DESC" },
+          })
+        } catch (err2) {
+          console.error('Fallback failed in findAllInputAssignments:', err2)
+          throw new Error(`Failed to fetch input assignments (fallback): ${(err2 as any)?.message || err2}`)
+        }
+      }
+
+      throw new Error(`Failed to fetch input assignments: ${(error as any)?.message || error}`)
+    }
   }
 
   // Fruit Receptions
@@ -157,7 +203,9 @@ export class ProducersService {
 
     try {
       const reception = this.fruitReceptionsRepository.create({
+        code: this.generateCode("FR"),
         ...dto,
+        date: new Date(),
         shipmentStatus: "pendiente",
       })
       await queryRunner.manager.save(reception)
@@ -204,7 +252,7 @@ export class ProducersService {
     await queryRunner.startTransaction()
 
     try {
-      const receptions = await this.fruitReceptionsRepository.findByIds(dto.receptionIds)
+      const receptions = await this.fruitReceptionsRepository.find({ where: { id: In(dto.receptionIds) } })
 
       if (receptions.length !== dto.receptionIds.length) {
         throw new BadRequestException("Some receptions not found")
@@ -218,6 +266,8 @@ export class ProducersService {
       const totalBoxes = receptions.reduce((sum, r) => sum + r.boxes, 0)
 
       const shipment = this.shipmentsRepository.create({
+        code: this.generateCode("SH"),
+        date: new Date(),
         totalBoxes,
         status: "embarcada",
         carrier: dto.carrier,
@@ -280,15 +330,25 @@ export class ProducersService {
           reception.shipmentStatus = "vendida"
           await queryRunner.manager.save(reception)
 
+            // compute previous balance for this producer
+            const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
+              where: { producerId: reception.producerId },
+              order: { createdAt: "DESC" },
+            })
+            const prevBalance = lastMovement ? Number(lastMovement.balance) : 0
+            const newBalance = prevBalance + Number(amount)
+
             const accountMovement = this.accountMovementsRepository.create({
               producerId: reception.producerId,
               type: "abono",
               amount,
+              balance: newBalance,
               description: `Venta de embarque - ${shipment.totalBoxes} cajas a $${salePrice}`,
               referenceType: "shipment",
               referenceId: shipment.id,
+              referenceCode: shipment.code,
             } as any)
-          await queryRunner.manager.save(accountMovement)
+            await queryRunner.manager.save(accountMovement)
         }
       }
 
@@ -345,10 +405,19 @@ export class ProducersService {
 
   // Payments
   async createPayment(dto: CreatePaymentDto): Promise<ProducerAccountMovement> {
+    // compute previous balance
+    const lastMovement = await this.accountMovementsRepository.findOne({
+      where: { producerId: dto.producerId },
+      order: { createdAt: "DESC" },
+    })
+    const prevBalance = lastMovement ? Number(lastMovement.balance) : 0
+    const newBalance = prevBalance + Number(dto.amount)
+
     const payment = this.accountMovementsRepository.create({
       producerId: dto.producerId,
       type: "pago",
       amount: dto.amount,
+      balance: newBalance,
       description: `Pago - ${dto.method}`,
       paymentMethod: dto.method,
       paymentReference: dto.reference,

@@ -13,6 +13,8 @@ exports.FruitReception = void 0;
 const typeorm_1 = require("typeorm");
 const producer_entity_1 = require("./producer.entity");
 const product_entity_1 = require("../../products/entities/product.entity");
+const shipment_entity_1 = require("./shipment.entity");
+const warehouse_entity_1 = require("../../warehouses/entities/warehouse.entity");
 let FruitReception = class FruitReception {
 };
 exports.FruitReception = FruitReception;
@@ -43,6 +45,15 @@ __decorate([
     __metadata("design:type", product_entity_1.Product)
 ], FruitReception.prototype, "product", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "warehouse_id" }),
+    __metadata("design:type", String)
+], FruitReception.prototype, "warehouseId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => warehouse_entity_1.Warehouse),
+    (0, typeorm_1.JoinColumn)({ name: "warehouse_id" }),
+    __metadata("design:type", warehouse_entity_1.Warehouse)
+], FruitReception.prototype, "warehouse", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "date" }),
     __metadata("design:type", Date)
 ], FruitReception.prototype, "date", void 0);
@@ -71,6 +82,11 @@ __decorate([
     (0, typeorm_1.Column)({ name: "shipment_id", nullable: true }),
     __metadata("design:type", String)
 ], FruitReception.prototype, "shipmentId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => shipment_entity_1.Shipment, (shipment) => shipment.receptions, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "shipment_id" }),
+    __metadata("design:type", shipment_entity_1.Shipment)
+], FruitReception.prototype, "shipment", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: "price_per_box", type: "decimal", precision: 10, scale: 2, nullable: true }),
     __metadata("design:type", Number)

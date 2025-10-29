@@ -35,9 +35,17 @@ let ProducersService = class ProducersService {
         this.inventoryService = inventoryService;
         this.dataSource = dataSource;
     }
+    generateCode(prefix) {
+        return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 9000) + 1000}`;
+    }
     async create(createProducerDto) {
-        const producer = this.producersRepository.create(createProducerDto);
-        return await this.producersRepository.save(producer);
+        const payload = { ...createProducerDto };
+        if (createProducerDto.taxId) {
+            payload.rfc = createProducerDto.taxId;
+        }
+        const producer = this.producersRepository.create(payload);
+        const saved = await this.producersRepository.save(producer);
+        return saved;
     }
     async findAll() {
         return await this.producersRepository.find({
@@ -61,7 +69,10 @@ let ProducersService = class ProducersService {
         try {
             const total = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
             const assignment = this.inputAssignmentsRepository.create({
+                code: this.generateCode("IA"),
                 producerId: dto.producerId,
+                warehouseId: dto.warehouseId,
+                date: new Date(),
                 total,
                 notes: dto.notes,
             });
@@ -86,13 +97,21 @@ let ProducersService = class ProducersService {
                     quantity: item.quantity,
                 })),
             });
+            const lastMovement = await queryRunner.manager.findOne(producer_account_movement_entity_1.ProducerAccountMovement, {
+                where: { producerId: dto.producerId },
+                order: { createdAt: "DESC" },
+            });
+            const prevBalance = lastMovement ? Number(lastMovement.balance) : 0;
+            const newBalance = prevBalance - Number(total);
             const accountMovement = this.accountMovementsRepository.create({
                 producerId: dto.producerId,
                 type: "cargo",
                 amount: total,
+                balance: newBalance,
                 description: "Asignación de insumos",
                 referenceType: "input_assignment",
                 referenceId: assignment.id,
+                referenceCode: assignment.code,
             });
             await queryRunner.manager.save(accountMovement);
             await queryRunner.commitTransaction();
@@ -110,10 +129,30 @@ let ProducersService = class ProducersService {
         }
     }
     async findAllInputAssignments() {
-        return await this.inputAssignmentsRepository.find({
-            relations: ["producer", "warehouse", "items", "items.product"],
-            order: { createdAt: "DESC" },
-        });
+        try {
+            return await this.inputAssignmentsRepository.find({
+                relations: ["producer", "warehouse", "items", "items.product"],
+                order: { createdAt: "DESC" },
+            });
+        }
+        catch (error) {
+            console.error("Error in findAllInputAssignments:", error);
+            const msg = (error?.message || "").toLowerCase();
+            if (msg.includes('warehouse_id') || msg.includes('does not exist') || error?.code === '42703') {
+                try {
+                    console.warn('Falling back to loading input assignments without warehouse relation');
+                    return await this.inputAssignmentsRepository.find({
+                        relations: ["producer", "items", "items.product"],
+                        order: { createdAt: "DESC" },
+                    });
+                }
+                catch (err2) {
+                    console.error('Fallback failed in findAllInputAssignments:', err2);
+                    throw new Error(`Failed to fetch input assignments (fallback): ${err2?.message || err2}`);
+                }
+            }
+            throw new Error(`Failed to fetch input assignments: ${error?.message || error}`);
+        }
     }
     async createFruitReception(dto) {
         const queryRunner = this.dataSource.createQueryRunner();
@@ -121,7 +160,9 @@ let ProducersService = class ProducersService {
         await queryRunner.startTransaction();
         try {
             const reception = this.fruitReceptionsRepository.create({
+                code: this.generateCode("FR"),
                 ...dto,
+                date: new Date(),
                 shipmentStatus: "pendiente",
             });
             await queryRunner.manager.save(reception);
@@ -162,7 +203,7 @@ let ProducersService = class ProducersService {
         await queryRunner.connect();
         await queryRunner.startTransaction();
         try {
-            const receptions = await this.fruitReceptionsRepository.findByIds(dto.receptionIds);
+            const receptions = await this.fruitReceptionsRepository.find({ where: { id: (0, typeorm_2.In)(dto.receptionIds) } });
             if (receptions.length !== dto.receptionIds.length) {
                 throw new common_1.BadRequestException("Some receptions not found");
             }
@@ -172,6 +213,8 @@ let ProducersService = class ProducersService {
             }
             const totalBoxes = receptions.reduce((sum, r) => sum + r.boxes, 0);
             const shipment = this.shipmentsRepository.create({
+                code: this.generateCode("SH"),
+                date: new Date(),
                 totalBoxes,
                 status: "embarcada",
                 carrier: dto.carrier,
@@ -223,13 +266,21 @@ let ProducersService = class ProducersService {
                     reception.finalTotal = amount;
                     reception.shipmentStatus = "vendida";
                     await queryRunner.manager.save(reception);
+                    const lastMovement = await queryRunner.manager.findOne(producer_account_movement_entity_1.ProducerAccountMovement, {
+                        where: { producerId: reception.producerId },
+                        order: { createdAt: "DESC" },
+                    });
+                    const prevBalance = lastMovement ? Number(lastMovement.balance) : 0;
+                    const newBalance = prevBalance + Number(amount);
                     const accountMovement = this.accountMovementsRepository.create({
                         producerId: reception.producerId,
                         type: "abono",
                         amount,
+                        balance: newBalance,
                         description: `Venta de embarque - ${shipment.totalBoxes} cajas a $${salePrice}`,
                         referenceType: "shipment",
                         referenceId: shipment.id,
+                        referenceCode: shipment.code,
                     });
                     await queryRunner.manager.save(accountMovement);
                 }
@@ -282,10 +333,17 @@ let ProducersService = class ProducersService {
         };
     }
     async createPayment(dto) {
+        const lastMovement = await this.accountMovementsRepository.findOne({
+            where: { producerId: dto.producerId },
+            order: { createdAt: "DESC" },
+        });
+        const prevBalance = lastMovement ? Number(lastMovement.balance) : 0;
+        const newBalance = prevBalance + Number(dto.amount);
         const payment = this.accountMovementsRepository.create({
             producerId: dto.producerId,
             type: "pago",
             amount: dto.amount,
+            balance: newBalance,
             description: `Pago - ${dto.method}`,
             paymentMethod: dto.method,
             paymentReference: dto.reference,
