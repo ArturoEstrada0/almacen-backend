@@ -11,6 +11,7 @@ import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.
 import { ProducersModule } from "./modules/producers/producers.module"
 import { QuotationsModule } from "./modules/quotations/quotations.module"
 import { AuthModule } from "./modules/auth/auth.module"
+import { ImportsModule } from "./modules/imports/imports.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
@@ -61,6 +62,8 @@ import { AuthModule } from "./modules/auth/auth.module"
     PurchaseOrdersModule,
     ProducersModule,
     QuotationsModule,
+    // Imports module handles file imports (products, warehouses...)
+    ImportsModule,
   ],
 })
 export class AppModule {}

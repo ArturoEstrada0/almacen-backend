@@ -47,6 +47,8 @@ let ProductsService = class ProductsService {
                 search: `%${filters.search}%`,
             });
         }
+        query.orderBy("product.sku", "ASC");
+        query.addOrderBy("product.name", "ASC");
         return await query.getMany();
     }
     async findOne(id) {

@@ -20,6 +20,7 @@ const purchase_orders_module_1 = require("./modules/purchase-orders/purchase-ord
 const producers_module_1 = require("./modules/producers/producers.module");
 const quotations_module_1 = require("./modules/quotations/quotations.module");
 const auth_module_1 = require("./modules/auth/auth.module");
+const imports_module_1 = require("./modules/imports/imports.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -69,6 +70,7 @@ exports.AppModule = AppModule = __decorate([
             purchase_orders_module_1.PurchaseOrdersModule,
             producers_module_1.ProducersModule,
             quotations_module_1.QuotationsModule,
+            imports_module_1.ImportsModule,
         ],
     })
 ], AppModule);

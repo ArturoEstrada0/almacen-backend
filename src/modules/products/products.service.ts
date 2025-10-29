@@ -51,6 +51,11 @@ export class ProductsService {
       })
     }
 
+  // Ordenar primero por SKU (ASC) y luego por nombre (A-Z)
+  // Prioriza SKU para determinismo cuando existan varios productos con el mismo nombre.
+  query.orderBy("product.sku", "ASC")
+  query.addOrderBy("product.name", "ASC")
+
     return await query.getMany()
   }
 

@@ -24,9 +24,20 @@ async function bootstrap() {
             enableImplicitConversion: true,
         },
     }));
+    const rawOrigins = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const allowedOrigins = rawOrigins.split(',').map(s => s.trim()).filter(Boolean);
     app.enableCors({
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        origin: (origin, callback) => {
+            if (!origin)
+                return callback(null, true);
+            if (allowedOrigins.includes(origin))
+                return callback(null, true);
+            console.warn(`CORS blocked origin: ${origin}`);
+            return callback(new Error('Not allowed by CORS'));
+        },
         credentials: true,
+        methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     });
     app.setGlobalPrefix("api");
     const config = new swagger_1.DocumentBuilder()

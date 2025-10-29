@@ -1,0 +1,292 @@
+[
+  {
+    "code": "MCR001",
+    "description": "CAJA 1 LIBRA NORT BAY ",
+    "initial": 13400,
+    "in": 0,
+    "out": 2425,
+    "stock": 10975,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR002",
+    "description": "CAJA 2LIBRAS NORTA BAY ",
+    "initial": 1500,
+    "in": 0,
+    "out": 0,
+    "stock": 1500,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR003",
+    "description": "CAJA 1LIBRA GENERICA",
+    "initial": 1075,
+    "in": 0,
+    "out": 0,
+    "stock": 1075,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR004",
+    "description": "CLAM 1LIBRA BYB (FRESA)",
+    "initial": 354000,
+    "in": 0,
+    "out": 0,
+    "stock": 354000,
+    "boxes": 590,
+    "boxes_pt": 44250
+  },
+  {
+    "code": "MCR005",
+    "description": "CLAM 2LIBRAS BYB(FRESA)",
+    "initial": 24180,
+    "in": 0,
+    "out": 0,
+    "stock": 24180,
+    "boxes": 100,
+    "boxes_pt": 6045
+  },
+  {
+    "code": "MCR006",
+    "description": "CLAM CABOS NORT BAY",
+    "initial": 21372,
+    "in": 0,
+    "out": 0,
+    "stock": 21372,
+    "boxes": 78,
+    "boxes_pt": 5343
+  },
+  {
+    "code": "MCR007",
+    "description": "CLAM 1LIBRA NORT BAY CONV",
+    "initial": 13475,
+    "in": 129600,
+    "out": 3000,
+    "stock": 140075,
+    "boxes": 233,
+    "boxes_pt": 17509
+  },
+  {
+    "code": "MCR008",
+    "description": "CLAM 2LIBRAS NORT BAY",
+    "initial": 10080,
+    "in": 0,
+    "out": 0,
+    "stock": 10080,
+    "boxes": 42,
+    "boxes_pt": 2520
+  },
+  {
+    "code": "MCR009",
+    "description": "CLAM 1LIBRA ORGANICO NB ",
+    "initial": 50000,
+    "in": 0,
+    "out": 26400,
+    "stock": 23600,
+    "boxes": 39,
+    "boxes_pt": 2950
+  },
+  {
+    "code": "MCR010",
+    "description": "CLAM 2LIBRAS ORGANICO NB ",
+    "initial": 29280,
+    "in": 0,
+    "out": 0,
+    "stock": 29280,
+    "boxes": 122,
+    "boxes_pt": 7320
+  },
+  {
+    "code": "MCR011",
+    "description": "CLAM 6OZ ORGANICO FRAM NB",
+    "initial": 63800,
+    "in": 180000,
+    "out": 54600,
+    "stock": 189200,
+    "boxes": 319,
+    "boxes_pt": 15766
+  },
+  {
+    "code": "MCR012",
+    "description": "CLAM 6OZ FRAMBUESA NB CONV",
+    "initial": 27000,
+    "in": null,
+    "out": 0,
+    "stock": 27000,
+    "boxes": 45,
+    "boxes_pt": 2250
+  },
+  {
+    "code": "MCR013",
+    "description": "INTERLOCK",
+    "initial": 250,
+    "in": 1100,
+    "out": 300,
+    "stock": 1050,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR014",
+    "description": "TARIMAS CHEP ",
+    "initial": 101,
+    "in": 0,
+    "out": 0,
+    "stock": 101,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR015",
+    "description": "TARIMA CONVENCIONAL",
+    "initial": 60,
+    "in": 0,
+    "out": 30,
+    "stock": 30,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR026",
+    "description": "TOP CAP GENERICO",
+    "initial": 2010,
+    "in": 0,
+    "out": 200,
+    "stock": 1810,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR027",
+    "description": "ESQUINEROS ",
+    "initial": 0,
+    "in": 3000,
+    "out": 200,
+    "stock": 2800,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR016",
+    "description": "ROLLO PARA FLEJE VERDE ",
+    "initial": 3,
+    "in": 15,
+    "out": null,
+    "stock": 18,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR017",
+    "description": "ETIQUETAS ZEBRA ",
+    "initial": 36000,
+    "in": 0,
+    "out": 0,
+    "stock": 36000,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR018",
+    "description": "ETIQUETAS BLANCAS ",
+    "initial": 30000,
+    "in": 1000000,
+    "out": 141000,
+    "stock": 889000,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR019",
+    "description": "ETIQUETAS VERDES ",
+    "initial": null,
+    "in": 505000,
+    "out": 34050,
+    "stock": 470950,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR020",
+    "description": "PISTOLA ETIQUETADORA ",
+    "initial": 25,
+    "in": 10,
+    "out": 16,
+    "stock": 19,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR021",
+    "description": "CAJA 6OZ NORT BAY ",
+    "initial": 9150,
+    "in": 0,
+    "out": 4500,
+    "stock": 4650,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR022",
+    "description": "TERMOGRAFOS",
+    "initial": 100,
+    "in": 0,
+    "out": 5,
+    "stock": 95,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR023",
+    "description": "GRAPAS GALVANIZADAS",
+    "initial": 2,
+    "in": 0,
+    "out": 0,
+    "stock": 2,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR024",
+    "description": "RIBBON PARA ZEBRA",
+    "initial": 16,
+    "in": 0,
+    "out": 0,
+    "stock": 16,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR025",
+    "description": "ETIQUETA VERDE ZEBRA",
+    "initial": 60000,
+    "in": 0,
+    "out": 0,
+    "stock": 60000,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR026",
+    "description": "ETIQUETA BLANCA ZEBRA",
+    "initial": 80000,
+    "in": null,
+    "out": 0,
+    "stock": 80000,
+    "boxes": null,
+    "boxes_pt": null
+  },
+  {
+    "code": "MCR027",
+    "description": "SELLOS DE SEGURIDAD ",
+    "initial": 170,
+    "in": 0,
+    "out": 10,
+    "stock": 160,
+    "boxes": null,
+    "boxes_pt": null
+  }
+]
