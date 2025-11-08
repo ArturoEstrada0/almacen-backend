@@ -6,6 +6,7 @@ import { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto"
 import { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto"
 import { CreateShipmentDto } from "./dto/create-shipment.dto"
 import { CreatePaymentDto } from "./dto/create-payment.dto"
+import { UpdateProducerDto } from "./dto/update-producer.dto"
 
 @ApiTags("producers")
 @Controller("producers")
@@ -98,5 +99,12 @@ export class ProducersController {
   @ApiResponse({ status: 201, description: "Payment created" })
   createPayment(@Body() dto: CreatePaymentDto) {
     return this.producersService.createPayment(dto)
+  }
+
+  @Patch(":id")
+  @ApiOperation({ summary: "Update a producer" })
+  @ApiResponse({ status: 200, description: "Producer updated successfully" })
+  async updateProducer(@Param("id", ParseUUIDPipe) id: string, @Body() updateProducerDto: UpdateProducerDto) {
+    return this.producersService.updateProducer(id, updateProducerDto)
   }
 }

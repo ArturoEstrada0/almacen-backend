@@ -89,6 +89,15 @@ export class ProducersService {
     return producer
   }
 
+  async updateProducer(id: string, updateProducerDto: any): Promise<Producer> {
+    const producer = await this.producersRepository.findOne({ where: { id } })
+    if (!producer) {
+      throw new NotFoundException(`Producer with ID ${id} not found`)
+    }
+    Object.assign(producer, updateProducerDto)
+    return await this.producersRepository.save(producer)
+  }
+
   // Input Assignments
   async createInputAssignment(dto: CreateInputAssignmentDto): Promise<InputAssignment> {
     const queryRunner = this.dataSource.createQueryRunner()

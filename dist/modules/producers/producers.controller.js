@@ -21,6 +21,7 @@ const create_input_assignment_dto_1 = require("./dto/create-input-assignment.dto
 const create_fruit_reception_dto_1 = require("./dto/create-fruit-reception.dto");
 const create_shipment_dto_1 = require("./dto/create-shipment.dto");
 const create_payment_dto_1 = require("./dto/create-payment.dto");
+const update_producer_dto_1 = require("./dto/update-producer.dto");
 let ProducersController = class ProducersController {
     constructor(producersService) {
         this.producersService = producersService;
@@ -60,6 +61,9 @@ let ProducersController = class ProducersController {
     }
     createPayment(dto) {
         return this.producersService.createPayment(dto);
+    }
+    async updateProducer(id, updateProducerDto) {
+        return this.producersService.updateProducer(id, updateProducerDto);
     }
 };
 exports.ProducersController = ProducersController;
@@ -169,6 +173,16 @@ __decorate([
     __metadata("design:paramtypes", [create_payment_dto_1.CreatePaymentDto]),
     __metadata("design:returntype", void 0)
 ], ProducersController.prototype, "createPayment", null);
+__decorate([
+    (0, common_1.Patch)(":id"),
+    (0, swagger_1.ApiOperation)({ summary: "Update a producer" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Producer updated successfully" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_producer_dto_1.UpdateProducerDto]),
+    __metadata("design:returntype", Promise)
+], ProducersController.prototype, "updateProducer", null);
 exports.ProducersController = ProducersController = __decorate([
     (0, swagger_1.ApiTags)("producers"),
     (0, common_1.Controller)("producers"),
