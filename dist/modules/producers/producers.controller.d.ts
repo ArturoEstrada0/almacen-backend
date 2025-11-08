@@ -4,6 +4,7 @@ import { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto";
 import { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto";
 import { CreateShipmentDto } from "./dto/create-shipment.dto";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
+import { UpdateProducerDto } from "./dto/update-producer.dto";
 export declare class ProducersController {
     private readonly producersService;
     constructor(producersService: ProducersService);
@@ -37,4 +38,5 @@ export declare class ProducersController {
         currentBalance: number;
     }>;
     createPayment(dto: CreatePaymentDto): Promise<import("./entities/producer-account-movement.entity").ProducerAccountMovement>;
+    updateProducer(id: string, updateProducerDto: UpdateProducerDto): Promise<import("./entities/producer.entity").Producer>;
 }

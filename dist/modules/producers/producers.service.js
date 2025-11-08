@@ -62,6 +62,14 @@ let ProducersService = class ProducersService {
         }
         return producer;
     }
+    async updateProducer(id, updateProducerDto) {
+        const producer = await this.producersRepository.findOne({ where: { id } });
+        if (!producer) {
+            throw new common_1.NotFoundException(`Producer with ID ${id} not found`);
+        }
+        Object.assign(producer, updateProducerDto);
+        return await this.producersRepository.save(producer);
+    }
     async createInputAssignment(dto) {
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();

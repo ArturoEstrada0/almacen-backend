@@ -26,6 +26,7 @@ export declare class ProducersService {
     create(createProducerDto: CreateProducerDto): Promise<Producer>;
     findAll(): Promise<Producer[]>;
     findOne(id: string): Promise<Producer>;
+    updateProducer(id: string, updateProducerDto: any): Promise<Producer>;
     createInputAssignment(dto: CreateInputAssignmentDto): Promise<InputAssignment>;
     findAllInputAssignments(): Promise<InputAssignment[]>;
     createFruitReception(dto: CreateFruitReceptionDto): Promise<FruitReception>;
