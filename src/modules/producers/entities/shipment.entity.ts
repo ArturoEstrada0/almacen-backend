@@ -22,6 +22,9 @@ export class Shipment {
   @Column({ name: "total_boxes", type: "decimal", precision: 10, scale: 2, default: 0 })
   totalBoxes: number
 
+  @Column({ name: "total_weight", type: "decimal", precision: 10, scale: 2, nullable: true })
+  totalWeight: number
+
   @Column({ nullable: true })
   carrier: string
 

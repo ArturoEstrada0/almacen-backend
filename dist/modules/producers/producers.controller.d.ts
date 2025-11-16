@@ -20,12 +20,12 @@ export declare class ProducersController {
     updateShipmentStatus(id: string, status: 'embarcada' | 'recibida' | 'vendida', salePrice?: number): Promise<import("./entities/shipment.entity").Shipment>;
     getAccountStatement(id: string): Promise<{
         movements: {
+            amount: number;
             balance: number;
             id: string;
             producerId: string;
             producer: import("./entities/producer.entity").Producer;
             type: "cargo" | "abono" | "pago";
-            amount: number;
             referenceType: string;
             referenceId: string;
             referenceCode: string;

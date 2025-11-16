@@ -129,6 +129,14 @@ let ProducersService = class ProducersService {
             });
         }
         catch (error) {
+            try {
+                console.error('Error in createInputAssignment:', error);
+                if (error?.stack)
+                    console.error(error.stack);
+            }
+            catch (logErr) {
+                console.error('Failed to log createInputAssignment error:', logErr);
+            }
             await queryRunner.rollbackTransaction();
             throw error;
         }
@@ -167,17 +175,31 @@ let ProducersService = class ProducersService {
         await queryRunner.connect();
         await queryRunner.startTransaction();
         try {
+            const boxes = Number(dto.boxes) || 0;
+            const weightPerBox = dto.weightPerBox !== undefined ? Number(dto.weightPerBox) : undefined;
+            let totalWeight = dto.totalWeight !== undefined ? Number(dto.totalWeight) : undefined;
+            if (totalWeight === undefined && weightPerBox !== undefined) {
+                totalWeight = Number((boxes * weightPerBox).toFixed(2));
+            }
+            const receptionDate = dto.date ? new Date(dto.date) : new Date();
             const reception = this.fruitReceptionsRepository.create({
                 code: this.generateCode("FR"),
-                ...dto,
-                date: new Date(),
+                producerId: dto.producerId,
+                productId: dto.productId,
+                warehouseId: dto.warehouseId,
+                boxes,
+                weightPerBox,
+                totalWeight,
+                date: receptionDate,
+                notes: dto.notes,
+                quality: dto.quality,
                 shipmentStatus: "pendiente",
             });
-            await queryRunner.manager.save(reception);
+            const savedReception = await queryRunner.manager.save(reception);
             await this.inventoryService.createMovement({
                 type: create_movement_dto_1.MovementType.ENTRADA,
                 warehouseId: dto.warehouseId,
-                reference: `Recepción de fruta - ${reception.id}`,
+                reference: `Recepción de fruta - ${savedReception.id}`,
                 notes: dto.notes,
                 items: [
                     {
@@ -188,7 +210,7 @@ let ProducersService = class ProducersService {
             });
             await queryRunner.commitTransaction();
             return await this.fruitReceptionsRepository.findOne({
-                where: { id: reception.id },
+                where: { id: savedReception.id },
                 relations: ["producer", "product", "warehouse"],
             });
         }
@@ -201,10 +223,30 @@ let ProducersService = class ProducersService {
         }
     }
     async findAllFruitReceptions() {
-        return await this.fruitReceptionsRepository.find({
-            relations: ["producer", "product", "warehouse", "shipment"],
-            order: { createdAt: "DESC" },
-        });
+        try {
+            return await this.fruitReceptionsRepository.find({
+                relations: ["producer", "product", "warehouse", "shipment"],
+                order: { createdAt: "DESC" },
+            });
+        }
+        catch (error) {
+            console.error('Error in findAllFruitReceptions:', error);
+            const msg = (error?.message || '').toLowerCase();
+            if (msg.includes('total_weight') || msg.includes('does not exist') || error?.code === '42703') {
+                try {
+                    console.warn('Falling back to loading fruit receptions without shipment relation');
+                    return await this.fruitReceptionsRepository.find({
+                        relations: ["producer", "product", "warehouse"],
+                        order: { createdAt: "DESC" },
+                    });
+                }
+                catch (err2) {
+                    console.error('Fallback failed in findAllFruitReceptions:', err2);
+                    throw new Error(`Failed to fetch fruit receptions (fallback): ${err2?.message || err2}`);
+                }
+            }
+            throw new Error(`Failed to fetch fruit receptions: ${error?.message || error}`);
+        }
     }
     async createShipment(dto) {
         const queryRunner = this.dataSource.createQueryRunner();
@@ -220,26 +262,90 @@ let ProducersService = class ProducersService {
                 throw new common_1.BadRequestException("All receptions must be pending");
             }
             const totalBoxes = receptions.reduce((sum, r) => sum + r.boxes, 0);
-            const shipment = this.shipmentsRepository.create({
+            const totalWeight = receptions.reduce((sum, r) => {
+                const rt = r.totalWeight !== undefined && r.totalWeight !== null ? Number(r.totalWeight) : undefined;
+                if (rt !== undefined && !Number.isNaN(rt))
+                    return sum + rt;
+                const wpb = r.weightPerBox !== undefined && r.weightPerBox !== null ? Number(r.weightPerBox) : undefined;
+                const boxes = r.boxes !== undefined && r.boxes !== null ? Number(r.boxes) : 0;
+                if (wpb !== undefined && !Number.isNaN(wpb))
+                    return sum + boxes * wpb;
+                return sum;
+            }, 0);
+            const shipmentPayload = {
                 code: this.generateCode("SH"),
                 date: new Date(),
                 totalBoxes,
+                totalWeight: Number(totalWeight.toFixed(2)),
                 status: "embarcada",
                 carrier: dto.carrier,
                 shippedAt: new Date(),
                 notes: dto.notes,
-            });
-            await queryRunner.manager.save(shipment);
+            };
+            let shipment;
+            try {
+                shipment = this.shipmentsRepository.create(shipmentPayload);
+                await queryRunner.manager.save(shipment);
+            }
+            catch (saveErr) {
+                const msg = (saveErr?.message || "").toLowerCase();
+                if (msg.includes('total_weight') || msg.includes('does not exist') || saveErr?.code === '42703') {
+                    console.warn('Database missing shipments.total_weight, saving shipment without totalWeight column');
+                    delete shipmentPayload.totalWeight;
+                    shipment = this.shipmentsRepository.create(shipmentPayload);
+                    await queryRunner.manager.save(shipment);
+                }
+                else {
+                    throw saveErr;
+                }
+            }
             for (const reception of receptions) {
                 reception.shipmentId = shipment.id;
                 reception.shipmentStatus = "embarcada";
                 await queryRunner.manager.save(reception);
             }
             await queryRunner.commitTransaction();
-            return await this.shipmentsRepository.findOne({
+            const savedShipment = await this.shipmentsRepository.findOne({
                 where: { id: shipment.id },
                 relations: ["receptions", "receptions.producer", "receptions.product"],
             });
+            if (savedShipment) {
+                const hasServerTotal = savedShipment.totalWeight !== undefined && savedShipment.totalWeight !== null;
+                if (!hasServerTotal) {
+                    try {
+                        ;
+                        savedShipment.totalWeight = Number(totalWeight.toFixed(2));
+                    }
+                    catch (e) {
+                        ;
+                        savedShipment.totalWeight = totalWeight;
+                    }
+                }
+                try {
+                    if (savedShipment.totalWeight !== undefined && savedShipment.totalWeight !== null) {
+                        savedShipment.totalWeight = Number(savedShipment.totalWeight);
+                    }
+                }
+                catch (e) {
+                }
+                try {
+                    if (savedShipment.totalBoxes !== undefined && savedShipment.totalBoxes !== null) {
+                        savedShipment.totalBoxes = Number(savedShipment.totalBoxes);
+                    }
+                }
+                catch (e) { }
+                if (Array.isArray(savedShipment.receptions)) {
+                    for (const r of savedShipment.receptions) {
+                        if (!r)
+                            continue;
+                        if (r.boxes !== undefined && r.boxes !== null)
+                            r.boxes = Number(r.boxes);
+                        if (r.totalWeight !== undefined && r.totalWeight !== null)
+                            r.totalWeight = Number(r.totalWeight);
+                    }
+                }
+            }
+            return savedShipment;
         }
         catch (error) {
             await queryRunner.rollbackTransaction();
@@ -309,10 +415,118 @@ let ProducersService = class ProducersService {
         }
     }
     async findAllShipments() {
-        return await this.shipmentsRepository.find({
-            relations: ["receptions", "receptions.producer", "receptions.product"],
-            order: { createdAt: "DESC" },
-        });
+        try {
+            const raw = await this.shipmentsRepository.find({
+                relations: ["receptions", "receptions.producer", "receptions.product"],
+                order: { createdAt: "DESC" },
+            });
+            const normalized = raw.map((s) => {
+                try {
+                    if (s.totalWeight !== undefined && s.totalWeight !== null)
+                        s.totalWeight = Number(s.totalWeight);
+                }
+                catch (e) { }
+                try {
+                    if (s.totalBoxes !== undefined && s.totalBoxes !== null)
+                        s.totalBoxes = Number(s.totalBoxes);
+                }
+                catch (e) { }
+                if (Array.isArray(s.receptions)) {
+                    s.receptionIds = s.receptions.map((r) => r.id);
+                    for (const r of s.receptions) {
+                        if (!r)
+                            continue;
+                        if (r.boxes !== undefined && r.boxes !== null)
+                            r.boxes = Number(r.boxes);
+                        if (r.totalWeight !== undefined && r.totalWeight !== null)
+                            r.totalWeight = Number(r.totalWeight);
+                    }
+                }
+                return s;
+            });
+            return normalized;
+        }
+        catch (error) {
+            console.error('Error in findAllShipments:', error);
+            const msg = (error?.message || '').toLowerCase();
+            if (msg.includes('total_weight') || msg.includes('does not exist') || error?.code === '42703') {
+                try {
+                    console.warn('Falling back to loading shipments without total_weight column or relations');
+                    const rawShipments = await this.shipmentsRepository
+                        .createQueryBuilder('s')
+                        .select([
+                        's.id',
+                        's.code',
+                        's.date',
+                        's.status',
+                        's.total_boxes',
+                        's.carrier',
+                        's.shipped_at',
+                        's.received_at',
+                        's.sale_price_per_box',
+                        's.total_sale',
+                        's.notes',
+                        's.created_at',
+                        's.updated_at',
+                    ])
+                        .orderBy('s.created_at', 'DESC')
+                        .getRawMany();
+                    const shipmentsPartial = rawShipments.map((r) => ({
+                        id: r.s_id,
+                        code: r.s_code,
+                        date: r.s_date,
+                        status: r.s_status,
+                        totalBoxes: r.s_total_boxes !== null ? Number(r.s_total_boxes) : undefined,
+                        carrier: r.s_carrier,
+                        shippedAt: r.s_shipped_at,
+                        receivedAt: r.s_received_at,
+                        salePricePerBox: r.s_sale_price_per_box !== null ? Number(r.s_sale_price_per_box) : undefined,
+                        totalSale: r.s_total_sale !== null ? Number(r.s_total_sale) : undefined,
+                        notes: r.s_notes,
+                        createdAt: r.s_created_at,
+                        updatedAt: r.s_updated_at,
+                    }));
+                    const shipmentIds = shipmentsPartial.map((s) => s.id);
+                    let receptions = [];
+                    try {
+                        receptions = await this.fruitReceptionsRepository.find({
+                            where: { shipmentId: (0, typeorm_2.In)(shipmentIds) },
+                            relations: ["producer", "product", "warehouse"],
+                        });
+                    }
+                    catch (receptionErr) {
+                        console.warn('Could not load receptions during shipments fallback:', receptionErr);
+                        receptions = [];
+                    }
+                    return shipmentsPartial.map((s) => {
+                        const reps = receptions.filter((r) => r.shipmentId === s.id);
+                        return {
+                            ...s,
+                            receptions: reps,
+                            receptionIds: reps.map((r) => r.id),
+                            totalBoxes: typeof s.totalBoxes === 'number' && !isNaN(s.totalBoxes)
+                                ? s.totalBoxes
+                                : reps.reduce((sum, r) => sum + (Number(r.boxes) || 0), 0),
+                            totalWeight: reps.reduce((sum, r) => {
+                                const rt = r.totalWeight !== undefined && r.totalWeight !== null ? Number(r.totalWeight) : undefined;
+                                if (rt !== undefined && !Number.isNaN(rt))
+                                    return sum + rt;
+                                const wpb = r.weightPerBox !== undefined && r.weightPerBox !== null ? Number(r.weightPerBox) : undefined;
+                                const boxes = r.boxes !== undefined && r.boxes !== null ? Number(r.boxes) : 0;
+                                if (wpb !== undefined && !Number.isNaN(wpb))
+                                    return sum + boxes * wpb;
+                                return sum;
+                            }, 0),
+                        };
+                    });
+                }
+                catch (err2) {
+                    console.error('Fallback failed in findAllShipments:', err2);
+                    throw new Error(`Failed to fetch shipments (fallback): ${err2?.message || err2}`);
+                }
+            }
+            throw new Error(`Failed to fetch shipments: ${error?.message || error}`);
+        }
     }
     async getAccountStatement(producerId) {
         const movements = await this.accountMovementsRepository.find({
@@ -321,17 +535,19 @@ let ProducersService = class ProducersService {
         });
         let balance = 0;
         const movementsWithBalance = movements.map((movement) => {
+            const amt = Number(movement.amount) || 0;
             if (movement.type === "cargo") {
-                balance -= movement.amount;
+                balance -= amt;
             }
             else if (movement.type === "abono") {
-                balance += movement.amount;
+                balance += amt;
             }
             else if (movement.type === "pago") {
-                balance += movement.amount;
+                balance -= amt;
             }
             return {
                 ...movement,
+                amount: amt,
                 balance,
             };
         });
@@ -346,18 +562,26 @@ let ProducersService = class ProducersService {
             order: { createdAt: "DESC" },
         });
         const prevBalance = lastMovement ? Number(lastMovement.balance) : 0;
-        const newBalance = prevBalance + Number(dto.amount);
-        const payment = this.accountMovementsRepository.create({
+        const amt = Number(dto.amount) || 0;
+        const movementType = dto.type || "pago";
+        let newBalance = prevBalance;
+        if (movementType === "abono") {
+            newBalance = prevBalance + amt;
+        }
+        else {
+            newBalance = prevBalance - amt;
+        }
+        const movement = this.accountMovementsRepository.create({
             producerId: dto.producerId,
-            type: "pago",
-            amount: dto.amount,
+            type: movementType,
+            amount: amt,
             balance: newBalance,
-            description: `Pago - ${dto.method}`,
+            description: movementType === "abono" ? `Abono` : movementType === "pago" ? `Pago - ${dto.method || ""}` : `Devolución`,
             paymentMethod: dto.method,
             paymentReference: dto.reference,
             notes: dto.notes,
         });
-        return await this.accountMovementsRepository.save(payment);
+        return await this.accountMovementsRepository.save(movement);
     }
 };
 exports.ProducersService = ProducersService;

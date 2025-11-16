@@ -4,10 +4,16 @@ export declare enum PaymentMethod {
     CHECK = "check",
     OTHER = "other"
 }
+export declare enum AccountMovementType {
+    CARGO = "cargo",
+    ABONO = "abono",
+    PAGO = "pago"
+}
 export declare class CreatePaymentDto {
     producerId: string;
     amount: number;
-    method: PaymentMethod;
+    method?: PaymentMethod;
     reference?: string;
     notes?: string;
+    type?: AccountMovementType;
 }

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreatePaymentDto = exports.PaymentMethod = void 0;
+exports.CreatePaymentDto = exports.AccountMovementType = exports.PaymentMethod = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 var PaymentMethod;
@@ -19,6 +19,12 @@ var PaymentMethod;
     PaymentMethod["CHECK"] = "check";
     PaymentMethod["OTHER"] = "other";
 })(PaymentMethod || (exports.PaymentMethod = PaymentMethod = {}));
+var AccountMovementType;
+(function (AccountMovementType) {
+    AccountMovementType["CARGO"] = "cargo";
+    AccountMovementType["ABONO"] = "abono";
+    AccountMovementType["PAGO"] = "pago";
+})(AccountMovementType || (exports.AccountMovementType = AccountMovementType = {}));
 class CreatePaymentDto {
 }
 exports.CreatePaymentDto = CreatePaymentDto;
@@ -35,9 +41,9 @@ __decorate([
     __metadata("design:type", Number)
 ], CreatePaymentDto.prototype, "amount", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ enum: PaymentMethod, example: PaymentMethod.TRANSFER }),
+    (0, swagger_1.ApiProperty)({ enum: PaymentMethod, example: PaymentMethod.TRANSFER, required: false }),
     (0, class_validator_1.IsEnum)(PaymentMethod),
-    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreatePaymentDto.prototype, "method", void 0);
 __decorate([
@@ -52,4 +58,10 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreatePaymentDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: AccountMovementType.PAGO, enum: AccountMovementType, required: false }),
+    (0, class_validator_1.IsEnum)(AccountMovementType),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreatePaymentDto.prototype, "type", void 0);
 //# sourceMappingURL=create-payment.dto.js.map

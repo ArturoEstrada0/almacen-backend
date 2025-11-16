@@ -40,6 +40,10 @@ __decorate([
     __metadata("design:type", Number)
 ], Shipment.prototype, "totalBoxes", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "total_weight", type: "decimal", precision: 10, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Shipment.prototype, "totalWeight", void 0);
+__decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Shipment.prototype, "carrier", void 0);

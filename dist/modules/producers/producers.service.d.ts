@@ -36,12 +36,12 @@ export declare class ProducersService {
     findAllShipments(): Promise<Shipment[]>;
     getAccountStatement(producerId: string): Promise<{
         movements: {
+            amount: number;
             balance: number;
             id: string;
             producerId: string;
             producer: Producer;
             type: "cargo" | "abono" | "pago";
-            amount: number;
             referenceType: string;
             referenceId: string;
             referenceCode: string;

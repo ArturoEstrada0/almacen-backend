@@ -8,6 +8,12 @@ export enum PaymentMethod {
   OTHER = "other",
 }
 
+export enum AccountMovementType {
+  CARGO = "cargo",
+  ABONO = "abono",
+  PAGO = "pago",
+}
+
 export class CreatePaymentDto {
   @ApiProperty({ example: "uuid" })
   @IsUUID()
@@ -19,10 +25,10 @@ export class CreatePaymentDto {
   @Min(0.01)
   amount: number
 
-  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.TRANSFER })
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.TRANSFER, required: false })
   @IsEnum(PaymentMethod)
-  @IsNotEmpty()
-  method: PaymentMethod
+  @IsOptional()
+  method?: PaymentMethod
 
   @ApiProperty({ example: "REF-12345", required: false })
   @IsString()
@@ -33,4 +39,9 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   notes?: string
+
+  @ApiProperty({ example: AccountMovementType.PAGO, enum: AccountMovementType, required: false })
+  @IsEnum(AccountMovementType)
+  @IsOptional()
+  type?: AccountMovementType
 }

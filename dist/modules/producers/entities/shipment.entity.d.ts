@@ -5,6 +5,7 @@ export declare class Shipment {
     date: Date;
     status: "embarcada" | "recibida" | "vendida";
     totalBoxes: number;
+    totalWeight: number;
     carrier: string;
     shippedAt: Date;
     receivedAt: Date;

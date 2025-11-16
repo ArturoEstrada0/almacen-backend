@@ -22,6 +22,21 @@ export class CreateFruitReceptionDto {
   @Min(1)
   boxes: number
 
+  @ApiProperty({ example: 1.25, required: false })
+  @IsNumber()
+  @IsOptional()
+  weightPerBox?: number
+
+  @ApiProperty({ example: 125.5, required: false })
+  @IsNumber()
+  @IsOptional()
+  totalWeight?: number
+
+  @ApiProperty({ example: "2025-11-14", required: false })
+  @IsString()
+  @IsOptional()
+  date?: string
+
   @ApiProperty({ example: "Calidad A", required: false })
   @IsString()
   @IsOptional()
