@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsUUID, IsNumber, Min, IsOptional } from "class-validator"
+import { IsString, IsNotEmpty, IsUUID, IsNumber, Min, IsOptional, IsDateString } from "class-validator"
 
 export class CreateFruitReceptionDto {
   @ApiProperty({ example: "uuid" })
@@ -21,6 +21,21 @@ export class CreateFruitReceptionDto {
   @IsNumber()
   @Min(1)
   boxes: number
+
+  @ApiProperty({ example: "2025-11-18", required: false })
+  @IsDateString()
+  @IsOptional()
+  date?: string
+
+  @ApiProperty({ example: 25.5, required: false })
+  @IsNumber()
+  @IsOptional()
+  weightPerBox?: number
+
+  @ApiProperty({ example: 2550, required: false })
+  @IsNumber()
+  @IsOptional()
+  totalWeight?: number
 
   @ApiProperty({ example: "Calidad A", required: false })
   @IsString()

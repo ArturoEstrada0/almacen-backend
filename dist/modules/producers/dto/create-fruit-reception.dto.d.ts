@@ -3,6 +3,9 @@ export declare class CreateFruitReceptionDto {
     productId: string;
     warehouseId: string;
     boxes: number;
+    date?: string;
+    weightPerBox?: number;
+    totalWeight?: number;
     quality?: string;
     notes?: string;
 }

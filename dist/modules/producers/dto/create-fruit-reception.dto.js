@@ -40,6 +40,24 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateFruitReceptionDto.prototype, "boxes", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: "2025-11-18", required: false }),
+    (0, class_validator_1.IsDateString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateFruitReceptionDto.prototype, "date", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 25.5, required: false }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateFruitReceptionDto.prototype, "weightPerBox", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 2550, required: false }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateFruitReceptionDto.prototype, "totalWeight", void 0);
+__decorate([
     (0, swagger_1.ApiProperty)({ example: "Calidad A", required: false }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
