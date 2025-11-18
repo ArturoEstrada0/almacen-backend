@@ -219,11 +219,11 @@ let ProducersService = class ProducersService {
             if (pendingReceptions.length !== receptions.length) {
                 throw new common_1.BadRequestException("All receptions must be pending");
             }
-            const totalBoxes = receptions.reduce((sum, r) => sum + r.boxes, 0);
+            const totalBoxes = receptions.reduce((sum, r) => sum + Number(r.boxes), 0);
             const shipment = this.shipmentsRepository.create({
                 code: this.generateCode("SH"),
                 date: new Date(),
-                totalBoxes,
+                totalBoxes: Number(totalBoxes),
                 status: "embarcada",
                 carrier: dto.carrier,
                 shippedAt: new Date(),

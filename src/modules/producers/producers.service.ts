@@ -272,16 +272,19 @@ export class ProducersService {
         throw new BadRequestException("All receptions must be pending")
       }
 
-      const totalBoxes = receptions.reduce((sum, r) => sum + r.boxes, 0)
+      // Convertir a número explícitamente para evitar concatenación de strings
+      const totalBoxes = receptions.reduce((sum, r) => sum + Number(r.boxes), 0)
 
+      // Solo incluir campos que existen en la entidad Shipment
       const shipment = this.shipmentsRepository.create({
         code: this.generateCode("SH"),
         date: new Date(),
-        totalBoxes,
+        totalBoxes: Number(totalBoxes), // Asegurar que sea número
         status: "embarcada",
         carrier: dto.carrier,
         shippedAt: new Date(),
         notes: dto.notes,
+        // driver no existe en la entidad, se omite
       })
       await queryRunner.manager.save(shipment)
 
