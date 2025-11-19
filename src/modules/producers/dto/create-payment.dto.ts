@@ -1,11 +1,24 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsUUID, IsNumber, Min, IsEnum, IsOptional } from "class-validator"
+import { IsString, IsNotEmpty, IsUUID, IsNumber, Min, IsEnum, IsOptional, IsArray, ValidateNested, IsObject } from "class-validator"
+import { Type } from "class-transformer"
 
 export enum PaymentMethod {
   CASH = "cash",
   TRANSFER = "transfer",
   CHECK = "check",
   OTHER = "other",
+}
+
+export class RetentionDto {
+  @ApiProperty({ example: 100.0 })
+  @IsNumber()
+  @Min(0.01)
+  amount: number
+
+  @ApiProperty({ example: "Retención por daños" })
+  @IsString()
+  @IsOptional()
+  notes?: string
 }
 
 export class CreatePaymentDto {
@@ -33,4 +46,26 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   notes?: string
+
+  @ApiProperty({ 
+    type: [String], 
+    example: ["uuid1", "uuid2"], 
+    required: false,
+    description: "IDs de los movimientos específicos que este pago cubre"
+  })
+  @IsArray()
+  @IsUUID("4", { each: true })
+  @IsOptional()
+  selectedMovements?: string[]
+
+  @ApiProperty({ 
+    type: RetentionDto,
+    required: false,
+    description: "Información de la retención aplicada al pago"
+  })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RetentionDto)
+  @IsOptional()
+  retention?: RetentionDto
 }

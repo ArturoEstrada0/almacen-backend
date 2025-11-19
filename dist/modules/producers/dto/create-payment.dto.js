@@ -9,9 +9,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreatePaymentDto = exports.PaymentMethod = void 0;
+exports.CreatePaymentDto = exports.RetentionDto = exports.PaymentMethod = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 var PaymentMethod;
 (function (PaymentMethod) {
     PaymentMethod["CASH"] = "cash";
@@ -19,6 +20,21 @@ var PaymentMethod;
     PaymentMethod["CHECK"] = "check";
     PaymentMethod["OTHER"] = "other";
 })(PaymentMethod || (exports.PaymentMethod = PaymentMethod = {}));
+class RetentionDto {
+}
+exports.RetentionDto = RetentionDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 100.0 }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0.01),
+    __metadata("design:type", Number)
+], RetentionDto.prototype, "amount", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "Retención por daños" }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], RetentionDto.prototype, "notes", void 0);
 class CreatePaymentDto {
 }
 exports.CreatePaymentDto = CreatePaymentDto;
@@ -52,4 +68,28 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreatePaymentDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        type: [String],
+        example: ["uuid1", "uuid2"],
+        required: false,
+        description: "IDs de los movimientos específicos que este pago cubre"
+    }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)("4", { each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreatePaymentDto.prototype, "selectedMovements", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        type: RetentionDto,
+        required: false,
+        description: "Información de la retención aplicada al pago"
+    }),
+    (0, class_validator_1.IsObject)(),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => RetentionDto),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", RetentionDto)
+], CreatePaymentDto.prototype, "retention", void 0);
 //# sourceMappingURL=create-payment.dto.js.map

@@ -331,7 +331,7 @@ let ProducersService = class ProducersService {
                     order: { createdAt: 'DESC' },
                 });
                 const currentBalance = Number(lastMovement?.balance || 0);
-                const newBalance = currentBalance - Number(dto.returnedBoxesValue);
+                const newBalance = currentBalance + Number(dto.returnedBoxesValue);
                 const accountMovement = queryRunner.manager.create(producer_account_movement_entity_1.ProducerAccountMovement, {
                     producerId: dto.producerId,
                     type: 'abono',
@@ -491,23 +491,59 @@ let ProducersService = class ProducersService {
         };
     }
     async createPayment(dto) {
-        const lastMovement = await this.accountMovementsRepository.findOne({
-            where: { producerId: dto.producerId },
-            order: { createdAt: "DESC" },
-        });
-        const prevBalance = lastMovement ? Number(lastMovement.balance) : 0;
-        const newBalance = prevBalance + Number(dto.amount);
-        const payment = this.accountMovementsRepository.create({
-            producerId: dto.producerId,
-            type: "pago",
-            amount: dto.amount,
-            balance: newBalance,
-            description: `Pago - ${dto.method}`,
-            paymentMethod: dto.method,
-            paymentReference: dto.reference,
-            notes: dto.notes,
-        });
-        return await this.accountMovementsRepository.save(payment);
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+        try {
+            const lastMovement = await queryRunner.manager.findOne(producer_account_movement_entity_1.ProducerAccountMovement, {
+                where: { producerId: dto.producerId },
+                order: { createdAt: "DESC" },
+            });
+            const prevBalance = lastMovement ? Number(lastMovement.balance) : 0;
+            let description = `Pago - ${dto.method}`;
+            if (dto.selectedMovements && dto.selectedMovements.length > 0) {
+                const movements = await queryRunner.manager.find(producer_account_movement_entity_1.ProducerAccountMovement, {
+                    where: { id: (0, typeorm_2.In)(dto.selectedMovements) }
+                });
+                const refs = movements.map(m => m.referenceCode).filter(Boolean).slice(0, 3).join(", ");
+                if (refs) {
+                    description += ` - Cubre: ${refs}${dto.selectedMovements.length > 3 ? ` y ${dto.selectedMovements.length - 3} más` : ""}`;
+                }
+            }
+            let newBalance = prevBalance - Number(dto.amount);
+            const payment = queryRunner.manager.create(producer_account_movement_entity_1.ProducerAccountMovement, {
+                producerId: dto.producerId,
+                type: "pago",
+                amount: dto.amount,
+                balance: newBalance,
+                description: description,
+                paymentMethod: dto.method,
+                paymentReference: dto.reference,
+                notes: dto.notes,
+            });
+            await queryRunner.manager.save(payment);
+            if (dto.retention && dto.retention.amount > 0) {
+                newBalance = newBalance + Number(dto.retention.amount);
+                const retention = queryRunner.manager.create(producer_account_movement_entity_1.ProducerAccountMovement, {
+                    producerId: dto.producerId,
+                    type: "cargo",
+                    amount: dto.retention.amount,
+                    balance: newBalance,
+                    description: `Retención - ${dto.retention.notes || "Descuento aplicado"}`,
+                    notes: dto.retention.notes,
+                });
+                await queryRunner.manager.save(retention);
+            }
+            await queryRunner.commitTransaction();
+            return payment;
+        }
+        catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        }
+        finally {
+            await queryRunner.release();
+        }
     }
 };
 exports.ProducersService = ProducersService;
