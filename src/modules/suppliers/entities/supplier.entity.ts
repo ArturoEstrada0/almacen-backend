@@ -46,6 +46,26 @@ export class Supplier {
   @Column({ default: true })
   active: boolean
 
+  // Cuenta en Pesos (MXN)
+  @Column({ name: "bank_name_mxn", nullable: true })
+  bankNameMxn: string
+
+  @Column({ name: "account_number_mxn", nullable: true })
+  accountNumberMxn: string
+
+  @Column({ name: "clabe_mxn", nullable: true })
+  clabeMxn: string
+
+  // Cuenta en Dólares (USD)
+  @Column({ name: "bank_name_usd", nullable: true })
+  bankNameUsd: string
+
+  @Column({ name: "account_number_usd", nullable: true })
+  accountNumberUsd: string
+
+  @Column({ name: "swift_code_usd", nullable: true })
+  swiftCodeUsd: string
+
   @OneToMany(
     () => ProductSupplier,
     (ps) => ps.supplier,

@@ -74,4 +74,40 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
 ], CreateSupplierDto.prototype, "isActive", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "BBVA Bancomer", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateSupplierDto.prototype, "bankNameMxn", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "1234567890", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateSupplierDto.prototype, "accountNumberMxn", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "012345678901234567", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateSupplierDto.prototype, "clabeMxn", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "Bank of America", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateSupplierDto.prototype, "bankNameUsd", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "9876543210", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateSupplierDto.prototype, "accountNumberUsd", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "BOFAUS3N", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateSupplierDto.prototype, "swiftCodeUsd", void 0);
 //# sourceMappingURL=create-supplier.dto.js.map

@@ -9,4 +9,10 @@ export declare class CreateSupplierDto {
     businessType?: string;
     creditDays?: number;
     isActive?: boolean;
+    bankNameMxn?: string;
+    accountNumberMxn?: string;
+    clabeMxn?: string;
+    bankNameUsd?: string;
+    accountNumberUsd?: string;
+    swiftCodeUsd?: string;
 }

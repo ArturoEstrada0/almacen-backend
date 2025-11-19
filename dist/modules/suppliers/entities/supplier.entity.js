@@ -73,6 +73,30 @@ __decorate([
     __metadata("design:type", Boolean)
 ], Supplier.prototype, "active", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "bank_name_mxn", nullable: true }),
+    __metadata("design:type", String)
+], Supplier.prototype, "bankNameMxn", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "account_number_mxn", nullable: true }),
+    __metadata("design:type", String)
+], Supplier.prototype, "accountNumberMxn", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "clabe_mxn", nullable: true }),
+    __metadata("design:type", String)
+], Supplier.prototype, "clabeMxn", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "bank_name_usd", nullable: true }),
+    __metadata("design:type", String)
+], Supplier.prototype, "bankNameUsd", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "account_number_usd", nullable: true }),
+    __metadata("design:type", String)
+], Supplier.prototype, "accountNumberUsd", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "swift_code_usd", nullable: true }),
+    __metadata("design:type", String)
+], Supplier.prototype, "swiftCodeUsd", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => product_supplier_entity_1.ProductSupplier, (ps) => ps.supplier),
     __metadata("design:type", Array)
 ], Supplier.prototype, "productSuppliers", void 0);

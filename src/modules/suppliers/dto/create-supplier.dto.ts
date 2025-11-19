@@ -50,4 +50,36 @@ export class CreateSupplierDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean
+
+  // Cuenta bancaria en Pesos (MXN)
+  @ApiProperty({ example: "BBVA Bancomer", required: false })
+  @IsString()
+  @IsOptional()
+  bankNameMxn?: string
+
+  @ApiProperty({ example: "1234567890", required: false })
+  @IsString()
+  @IsOptional()
+  accountNumberMxn?: string
+
+  @ApiProperty({ example: "012345678901234567", required: false })
+  @IsString()
+  @IsOptional()
+  clabeMxn?: string
+
+  // Cuenta bancaria en Dólares (USD)
+  @ApiProperty({ example: "Bank of America", required: false })
+  @IsString()
+  @IsOptional()
+  bankNameUsd?: string
+
+  @ApiProperty({ example: "9876543210", required: false })
+  @IsString()
+  @IsOptional()
+  accountNumberUsd?: string
+
+  @ApiProperty({ example: "BOFAUS3N", required: false })
+  @IsString()
+  @IsOptional()
+  swiftCodeUsd?: string
 }

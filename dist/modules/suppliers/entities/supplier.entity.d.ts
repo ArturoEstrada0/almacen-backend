@@ -15,6 +15,12 @@ export declare class Supplier {
     businessType: string;
     paymentTerms: number;
     active: boolean;
+    bankNameMxn: string;
+    accountNumberMxn: string;
+    clabeMxn: string;
+    bankNameUsd: string;
+    accountNumberUsd: string;
+    swiftCodeUsd: string;
     productSuppliers: ProductSupplier[];
     quotations: Quotation[];
     createdAt: Date;
