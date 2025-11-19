@@ -24,13 +24,17 @@ __decorate([
     __metadata("design:type", String)
 ], Shipment.prototype, "code", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "date" }),
-    __metadata("design:type", Date)
+    (0, typeorm_1.Column)({ name: "tracking_folio", nullable: true }),
+    __metadata("design:type", String)
+], Shipment.prototype, "trackingFolio", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 10 }),
+    __metadata("design:type", String)
 ], Shipment.prototype, "date", void 0);
 __decorate([
     (0, typeorm_1.Column)({
         type: "enum",
-        enum: ["embarcada", "recibida", "vendida"],
+        enum: ["embarcada", "en-transito", "recibida", "vendida"],
         default: "embarcada",
     }),
     __metadata("design:type", String)

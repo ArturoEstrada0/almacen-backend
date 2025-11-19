@@ -40,6 +40,12 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateFruitReceptionDto.prototype, "boxes", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: "TRK-MI6CT93L-5023", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateFruitReceptionDto.prototype, "trackingFolio", void 0);
+__decorate([
     (0, swagger_1.ApiProperty)({ example: "2025-11-18", required: false }),
     (0, class_validator_1.IsDateString)(),
     (0, class_validator_1.IsOptional)(),
@@ -69,4 +75,18 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateFruitReceptionDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 100, description: "Cantidad de cajas devueltas por el productor", required: false }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], CreateFruitReceptionDto.prototype, "returnedBoxes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 500, description: "Valor del material de empaque devuelto (genera abono)", required: false }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], CreateFruitReceptionDto.prototype, "returnedBoxesValue", void 0);
 //# sourceMappingURL=create-fruit-reception.dto.js.map

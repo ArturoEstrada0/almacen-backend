@@ -13,6 +13,10 @@ export declare class ProducersController {
     findOne(id: string): Promise<import("./entities/producer.entity").Producer>;
     createInputAssignment(dto: CreateInputAssignmentDto): Promise<import("./entities/input-assignment.entity").InputAssignment>;
     findAllInputAssignments(): Promise<import("./entities/input-assignment.entity").InputAssignment[]>;
+    updateInputAssignment(id: string, dto: CreateInputAssignmentDto): Promise<import("./entities/input-assignment.entity").InputAssignment>;
+    deleteInputAssignment(id: string): Promise<{
+        message: string;
+    }>;
     createFruitReception(dto: CreateFruitReceptionDto): Promise<import("./entities/fruit-reception.entity").FruitReception>;
     findAllFruitReceptions(): Promise<import("./entities/fruit-reception.entity").FruitReception[]>;
     createShipment(dto: CreateShipmentDto): Promise<import("./entities/shipment.entity").Shipment>;
@@ -33,6 +37,7 @@ export declare class ProducersController {
             paymentMethod: string;
             paymentReference: string;
             evidenceUrl: string;
+            date: string;
             createdAt: Date;
         }[];
         currentBalance: number;

@@ -9,15 +9,18 @@ export class Shipment {
   @Column({ unique: true })
   code: string
 
-  @Column({ type: "date" })
-  date: Date
+  @Column({ name: "tracking_folio", nullable: true })
+  trackingFolio: string
+
+  @Column({ type: "varchar", length: 10 })
+  date: string
 
   @Column({
     type: "enum",
-    enum: ["embarcada", "recibida", "vendida"],
+    enum: ["embarcada", "en-transito", "recibida", "vendida"],
     default: "embarcada",
   })
-  status: "embarcada" | "recibida" | "vendida"
+  status: "embarcada" | "en-transito" | "recibida" | "vendida"
 
   @Column({ name: "total_boxes", type: "decimal", precision: 10, scale: 2, default: 0 })
   totalBoxes: number

@@ -23,16 +23,21 @@ export declare class ProducersService {
     private dataSource;
     constructor(producersRepository: Repository<Producer>, inputAssignmentsRepository: Repository<InputAssignment>, inputAssignmentItemsRepository: Repository<InputAssignmentItem>, fruitReceptionsRepository: Repository<FruitReception>, shipmentsRepository: Repository<Shipment>, accountMovementsRepository: Repository<ProducerAccountMovement>, inventoryService: InventoryService, dataSource: DataSource);
     private generateCode;
+    private generateTrackingFolio;
     create(createProducerDto: CreateProducerDto): Promise<Producer>;
     findAll(): Promise<Producer[]>;
     findOne(id: string): Promise<Producer>;
     updateProducer(id: string, updateProducerDto: any): Promise<Producer>;
     createInputAssignment(dto: CreateInputAssignmentDto): Promise<InputAssignment>;
     findAllInputAssignments(): Promise<InputAssignment[]>;
+    updateInputAssignment(id: string, dto: CreateInputAssignmentDto): Promise<InputAssignment>;
+    deleteInputAssignment(id: string): Promise<{
+        message: string;
+    }>;
     createFruitReception(dto: CreateFruitReceptionDto): Promise<FruitReception>;
     findAllFruitReceptions(): Promise<FruitReception[]>;
     createShipment(dto: CreateShipmentDto): Promise<Shipment>;
-    updateShipmentStatus(id: string, status: 'embarcada' | 'recibida' | 'vendida', salePrice?: number): Promise<Shipment>;
+    updateShipmentStatus(id: string, status: 'embarcada' | 'en-transito' | 'recibida' | 'vendida', salePrice?: number): Promise<Shipment>;
     findAllShipments(): Promise<Shipment[]>;
     getAccountStatement(producerId: string): Promise<{
         movements: {
@@ -49,6 +54,7 @@ export declare class ProducersService {
             paymentMethod: string;
             paymentReference: string;
             evidenceUrl: string;
+            date: string;
             createdAt: Date;
         }[];
         currentBalance: number;

@@ -2,8 +2,9 @@ import { FruitReception } from "./fruit-reception.entity";
 export declare class Shipment {
     id: string;
     code: string;
-    date: Date;
-    status: "embarcada" | "recibida" | "vendida";
+    trackingFolio: string;
+    date: string;
+    status: "embarcada" | "en-transito" | "recibida" | "vendida";
     totalBoxes: number;
     carrier: string;
     shippedAt: Date;

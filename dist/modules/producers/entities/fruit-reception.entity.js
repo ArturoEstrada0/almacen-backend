@@ -27,6 +27,10 @@ __decorate([
     __metadata("design:type", String)
 ], FruitReception.prototype, "code", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "tracking_folio", nullable: true }),
+    __metadata("design:type", String)
+], FruitReception.prototype, "trackingFolio", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: "producer_id" }),
     __metadata("design:type", String)
 ], FruitReception.prototype, "producerId", void 0);
@@ -54,8 +58,8 @@ __decorate([
     __metadata("design:type", warehouse_entity_1.Warehouse)
 ], FruitReception.prototype, "warehouse", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "date" }),
-    __metadata("design:type", Date)
+    (0, typeorm_1.Column)({ type: "varchar", length: 10 }),
+    __metadata("design:type", String)
 ], FruitReception.prototype, "date", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2 }),
@@ -95,6 +99,14 @@ __decorate([
     (0, typeorm_1.Column)({ name: "final_total", type: "decimal", precision: 10, scale: 2, nullable: true }),
     __metadata("design:type", Number)
 ], FruitReception.prototype, "finalTotal", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "returned_boxes", type: "decimal", precision: 10, scale: 2, nullable: true, default: 0 }),
+    __metadata("design:type", Number)
+], FruitReception.prototype, "returnedBoxes", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "returned_boxes_value", type: "decimal", precision: 10, scale: 2, nullable: true, default: 0 }),
+    __metadata("design:type", Number)
+], FruitReception.prototype, "returnedBoxesValue", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)

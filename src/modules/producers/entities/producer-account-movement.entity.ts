@@ -46,6 +46,9 @@ export class ProducerAccountMovement {
   @Column({ name: "evidence_url", nullable: true })
   evidenceUrl: string
 
+  @Column({ type: "varchar", length: 10, nullable: true })
+  date: string
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date
 }

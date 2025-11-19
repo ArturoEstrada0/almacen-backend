@@ -26,6 +26,10 @@ __decorate([
     __metadata("design:type", String)
 ], InputAssignment.prototype, "code", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "tracking_folio", unique: true }),
+    __metadata("design:type", String)
+], InputAssignment.prototype, "trackingFolio", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: "producer_id" }),
     __metadata("design:type", String)
 ], InputAssignment.prototype, "producerId", void 0);
@@ -35,8 +39,8 @@ __decorate([
     __metadata("design:type", producer_entity_1.Producer)
 ], InputAssignment.prototype, "producer", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: "assignment_date", type: "date" }),
-    __metadata("design:type", Date)
+    (0, typeorm_1.Column)({ name: "assignment_date", type: "varchar", length: 10 }),
+    __metadata("design:type", String)
 ], InputAssignment.prototype, "date", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: "warehouse_id", nullable: true }),

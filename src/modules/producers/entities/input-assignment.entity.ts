@@ -20,6 +20,9 @@ export class InputAssignment {
   @Column({ name: "assignment_number", unique: true })
   code: string
 
+  @Column({ name: "tracking_folio", unique: true })
+  trackingFolio: string
+
   @Column({ name: "producer_id" })
   producerId: string
 
@@ -27,8 +30,8 @@ export class InputAssignment {
   @JoinColumn({ name: "producer_id" })
   producer: Producer
 
-  @Column({ name: "assignment_date", type: "date" })
-  date: Date
+  @Column({ name: "assignment_date", type: "varchar", length: 10 })
+  date: string
 
   @Column({ name: "warehouse_id", nullable: true })
   warehouseId: string

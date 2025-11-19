@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsArray, IsUUID, IsOptional } from "class-validator"
+import { IsString, IsNotEmpty, IsArray, IsUUID, IsOptional, IsDateString } from "class-validator"
 
 export class CreateShipmentDto {
   @ApiProperty({ example: ["uuid1", "uuid2"] })
@@ -7,6 +7,11 @@ export class CreateShipmentDto {
   @IsUUID("4", { each: true })
   @IsNotEmpty()
   receptionIds: string[]
+
+  @ApiProperty({ example: "2025-11-18", required: false })
+  @IsDateString()
+  @IsOptional()
+  date?: string
 
   @ApiProperty({ example: "Transportes ABC", required: false })
   @IsString()

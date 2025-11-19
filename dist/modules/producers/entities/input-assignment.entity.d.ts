@@ -4,9 +4,10 @@ import { Warehouse } from "../../warehouses/entities/warehouse.entity";
 export declare class InputAssignment {
     id: string;
     code: string;
+    trackingFolio: string;
     producerId: string;
     producer: Producer;
-    date: Date;
+    date: string;
     warehouseId: string;
     warehouse: Warehouse;
     total: number;

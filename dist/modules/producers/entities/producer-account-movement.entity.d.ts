@@ -13,5 +13,6 @@ export declare class ProducerAccountMovement {
     paymentMethod: string;
     paymentReference: string;
     evidenceUrl: string;
+    date: string;
     createdAt: Date;
 }

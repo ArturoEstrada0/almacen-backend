@@ -5,13 +5,14 @@ import { Warehouse } from "../../warehouses/entities/warehouse.entity";
 export declare class FruitReception {
     id: string;
     code: string;
+    trackingFolio: string;
     producerId: string;
     producer: Producer;
     productId: string;
     product: Product;
     warehouseId: string;
     warehouse: Warehouse;
-    date: Date;
+    date: string;
     boxes: number;
     weightPerBox: number;
     totalWeight: number;
@@ -20,6 +21,8 @@ export declare class FruitReception {
     shipment: Shipment;
     pricePerBox: number;
     finalTotal: number;
+    returnedBoxes: number;
+    returnedBoxesValue: number;
     notes: string;
     createdAt: Date;
     updatedAt: Date;

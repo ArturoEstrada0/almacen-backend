@@ -50,6 +50,18 @@ __decorate([
     __metadata("design:type", String)
 ], CreateInputAssignmentDto.prototype, "warehouseId", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: "2025-11-18", required: false }),
+    (0, class_validator_1.IsDateString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateInputAssignmentDto.prototype, "date", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "251119-456", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateInputAssignmentDto.prototype, "trackingFolio", void 0);
+__decorate([
     (0, swagger_1.ApiProperty)({ example: "Asignación de fertilizantes", required: false }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),

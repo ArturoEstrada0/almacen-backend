@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, ParseUUIDPipe } from "@nestjs/common"
+import { Controller, Get, Post, Body, Param, Patch, Delete, ParseUUIDPipe } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger"
 import { ProducersService } from "./producers.service"
 import { CreateProducerDto } from "./dto/create-producer.dto"
@@ -46,6 +46,20 @@ export class ProducersController {
   @ApiResponse({ status: 200, description: "List of input assignments" })
   findAllInputAssignments() {
     return this.producersService.findAllInputAssignments()
+  }
+
+  @Patch("input-assignments/:id")
+  @ApiOperation({ summary: "Update input assignment" })
+  @ApiResponse({ status: 200, description: "Input assignment updated" })
+  updateInputAssignment(@Param("id", ParseUUIDPipe) id: string, @Body() dto: CreateInputAssignmentDto) {
+    return this.producersService.updateInputAssignment(id, dto)
+  }
+
+  @Delete("input-assignments/:id")
+  @ApiOperation({ summary: "Delete input assignment" })
+  @ApiResponse({ status: 200, description: "Input assignment deleted" })
+  deleteInputAssignment(@Param("id", ParseUUIDPipe) id: string) {
+    return this.producersService.deleteInputAssignment(id)
   }
 
   @Post("fruit-receptions")

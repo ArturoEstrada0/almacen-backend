@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsUUID, IsOptional, IsArray, ValidateNested, IsNumber, Min } from "class-validator"
+import { IsString, IsNotEmpty, IsUUID, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsDateString } from "class-validator"
 import { Type } from "class-transformer"
 
 export class InputAssignmentItemDto {
@@ -29,6 +29,16 @@ export class CreateInputAssignmentDto {
   @IsUUID()
   @IsNotEmpty()
   warehouseId: string
+
+  @ApiProperty({ example: "2025-11-18", required: false })
+  @IsDateString()
+  @IsOptional()
+  date?: string
+
+  @ApiProperty({ example: "251119-456", required: false })
+  @IsString()
+  @IsOptional()
+  trackingFolio?: string
 
   @ApiProperty({ example: "Asignación de fertilizantes", required: false })
   @IsString()

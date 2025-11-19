@@ -23,6 +23,12 @@ __decorate([
     __metadata("design:type", Array)
 ], CreateShipmentDto.prototype, "receptionIds", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: "2025-11-18", required: false }),
+    (0, class_validator_1.IsDateString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateShipmentDto.prototype, "date", void 0);
+__decorate([
     (0, swagger_1.ApiProperty)({ example: "Transportes ABC", required: false }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),

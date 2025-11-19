@@ -6,6 +6,8 @@ export declare class InputAssignmentItemDto {
 export declare class CreateInputAssignmentDto {
     producerId: string;
     warehouseId: string;
+    date?: string;
+    trackingFolio?: string;
     notes?: string;
     items: InputAssignmentItemDto[];
 }

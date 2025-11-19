@@ -20,6 +20,9 @@ export class FruitReception {
   @Column({ unique: true })
   code: string
 
+  @Column({ name: "tracking_folio", nullable: true })
+  trackingFolio: string
+
   @Column({ name: "producer_id" })
   producerId: string
 
@@ -41,8 +44,8 @@ export class FruitReception {
   @JoinColumn({ name: "warehouse_id" })
   warehouse: Warehouse
 
-  @Column({ type: "date" })
-  date: Date
+  @Column({ type: "varchar", length: 10 })
+  date: string
 
   @Column({ type: "decimal", precision: 10, scale: 2 })
   boxes: number
@@ -73,6 +76,13 @@ export class FruitReception {
 
   @Column({ name: "final_total", type: "decimal", precision: 10, scale: 2, nullable: true })
   finalTotal: number
+
+  // Material de empaque devuelto
+  @Column({ name: "returned_boxes", type: "decimal", precision: 10, scale: 2, nullable: true, default: 0 })
+  returnedBoxes: number
+
+  @Column({ name: "returned_boxes_value", type: "decimal", precision: 10, scale: 2, nullable: true, default: 0 })
+  returnedBoxesValue: number
 
   @Column({ type: "text", nullable: true })
   notes: string
