@@ -8,6 +8,8 @@ import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
+import { PaymentReport } from "./entities/payment-report.entity"
+import { PaymentReportItem } from "./entities/payment-report-item.entity"
 import { InventoryModule } from "../inventory/inventory.module"
 
 @Module({
@@ -19,6 +21,8 @@ import { InventoryModule } from "../inventory/inventory.module"
       FruitReception,
       Shipment,
       ProducerAccountMovement,
+      PaymentReport,
+      PaymentReportItem,
     ]),
     InventoryModule,
   ],

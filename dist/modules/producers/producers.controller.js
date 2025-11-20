@@ -21,6 +21,7 @@ const create_input_assignment_dto_1 = require("./dto/create-input-assignment.dto
 const create_fruit_reception_dto_1 = require("./dto/create-fruit-reception.dto");
 const create_shipment_dto_1 = require("./dto/create-shipment.dto");
 const create_payment_dto_1 = require("./dto/create-payment.dto");
+const create_payment_report_dto_1 = require("./dto/create-payment-report.dto");
 const update_producer_dto_1 = require("./dto/update-producer.dto");
 let ProducersController = class ProducersController {
     constructor(producersService) {
@@ -79,6 +80,24 @@ let ProducersController = class ProducersController {
     }
     createPayment(dto) {
         return this.producersService.createPayment(dto);
+    }
+    createPaymentReport(dto) {
+        return this.producersService.createPaymentReport(dto);
+    }
+    findAllPaymentReports() {
+        return this.producersService.findAllPaymentReports();
+    }
+    findOnePaymentReport(id) {
+        return this.producersService.findOnePaymentReport(id);
+    }
+    updatePaymentReport(id, dto) {
+        return this.producersService.updatePaymentReport(id, dto);
+    }
+    updatePaymentReportStatus(id, dto) {
+        return this.producersService.updatePaymentReportStatus(id, dto);
+    }
+    deletePaymentReport(id) {
+        return this.producersService.deletePaymentReport(id);
     }
     async updateProducer(id, updateProducerDto) {
         return this.producersService.updateProducer(id, updateProducerDto);
@@ -248,6 +267,61 @@ __decorate([
     __metadata("design:paramtypes", [create_payment_dto_1.CreatePaymentDto]),
     __metadata("design:returntype", void 0)
 ], ProducersController.prototype, "createPayment", null);
+__decorate([
+    (0, common_1.Post)("payment-reports"),
+    (0, swagger_1.ApiOperation)({ summary: "Create payment report" }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: "Payment report created" }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [create_payment_report_dto_1.CreatePaymentReportDto]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "createPaymentReport", null);
+__decorate([
+    (0, common_1.Get)("payment-reports/all"),
+    (0, swagger_1.ApiOperation)({ summary: "Get all payment reports" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "List of payment reports" }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "findAllPaymentReports", null);
+__decorate([
+    (0, common_1.Get)("payment-reports/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Get payment report by ID" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Payment report details" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "findOnePaymentReport", null);
+__decorate([
+    (0, common_1.Patch)("payment-reports/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Update payment report" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Payment report updated" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, create_payment_report_dto_1.CreatePaymentReportDto]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "updatePaymentReport", null);
+__decorate([
+    (0, common_1.Patch)("payment-reports/:id/status"),
+    (0, swagger_1.ApiOperation)({ summary: "Update payment report status" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Payment report status updated" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, create_payment_report_dto_1.UpdatePaymentReportStatusDto]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "updatePaymentReportStatus", null);
+__decorate([
+    (0, common_1.Delete)("payment-reports/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Delete payment report" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Payment report deleted" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "deletePaymentReport", null);
 __decorate([
     (0, common_1.Patch)(":id"),
     (0, swagger_1.ApiOperation)({ summary: "Update a producer" }),

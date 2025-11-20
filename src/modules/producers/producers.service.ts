@@ -8,11 +8,14 @@ import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
+import { PaymentReport } from "./entities/payment-report.entity"
+import { PaymentReportItem } from "./entities/payment-report-item.entity"
 import type { CreateProducerDto } from "./dto/create-producer.dto"
 import type { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto"
 import type { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto"
 import type { CreateShipmentDto } from "./dto/create-shipment.dto"
 import type { CreatePaymentDto } from "./dto/create-payment.dto"
+import type { CreatePaymentReportDto, UpdatePaymentReportStatusDto } from "./dto/create-payment-report.dto"
 import { InventoryService } from "../inventory/inventory.service"
 import { MovementType } from "../inventory/dto/create-movement.dto"
 import { Product } from "../products/entities/product.entity"
@@ -25,6 +28,8 @@ export class ProducersService {
   private fruitReceptionsRepository: Repository<FruitReception>
   private shipmentsRepository: Repository<Shipment>
   private accountMovementsRepository: Repository<ProducerAccountMovement>
+  private paymentReportsRepository: Repository<PaymentReport>
+  private paymentReportItemsRepository: Repository<PaymentReportItem>
   private inventoryService: InventoryService
   private dataSource: DataSource
 
@@ -41,6 +46,10 @@ export class ProducersService {
     shipmentsRepository: Repository<Shipment>,
     @InjectRepository(ProducerAccountMovement)
     accountMovementsRepository: Repository<ProducerAccountMovement>,
+    @InjectRepository(PaymentReport)
+    paymentReportsRepository: Repository<PaymentReport>,
+    @InjectRepository(PaymentReportItem)
+    paymentReportItemsRepository: Repository<PaymentReportItem>,
     inventoryService: InventoryService,
     dataSource: DataSource,
   ) {
@@ -50,6 +59,8 @@ export class ProducersService {
     this.fruitReceptionsRepository = fruitReceptionsRepository
     this.shipmentsRepository = shipmentsRepository
     this.accountMovementsRepository = accountMovementsRepository
+    this.paymentReportsRepository = paymentReportsRepository
+    this.paymentReportItemsRepository = paymentReportItemsRepository
     this.inventoryService = inventoryService
     this.dataSource = dataSource
   }
@@ -735,7 +746,6 @@ export class ProducersService {
       await queryRunner.release()
     }
   }
-  }
 
   async deleteShipment(id: string): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner()
@@ -837,10 +847,10 @@ export class ProducersService {
       } as any)
       await queryRunner.manager.save(payment)
 
-      // Si hay retención, registrar como cargo (aumenta lo que nos debe el productor)
-      // La retención es un cobro/descuento que hacemos, entonces aumenta la deuda del productor hacia nosotros
+      // Si hay retención, registrar como cargo (reduce lo que le debemos al productor)
+      // La retención es un descuento que aplicamos, entonces reduce el saldo a favor del productor
       if (dto.retention && dto.retention.amount > 0) {
-        newBalance = newBalance + Number(dto.retention.amount)
+        newBalance = newBalance - Number(dto.retention.amount)  // RESTAR la retención
         const retention = queryRunner.manager.create(ProducerAccountMovement, {
           producerId: dto.producerId,
           type: "cargo",
@@ -852,6 +862,98 @@ export class ProducersService {
         await queryRunner.manager.save(retention)
       }
 
+      // Crear Reporte de Pago automáticamente
+      // Solo si hay movimientos seleccionados que sean recepciones de fruta
+      console.log('=== PAYMENT REPORT DEBUG ===')
+      console.log('selectedMovements:', dto.selectedMovements)
+      console.log('selectedMovements length:', dto.selectedMovements?.length)
+      
+      if (dto.selectedMovements && dto.selectedMovements.length > 0) {
+        // Obtener los movimientos seleccionados para verificar si son ventas de embarques
+        const movements = await queryRunner.manager.find(ProducerAccountMovement, {
+          where: { id: In(dto.selectedMovements) }
+        })
+        
+        console.log('movements found:', movements.length)
+        console.log('movements:', movements.map(m => ({ id: m.id, type: m.type, refType: m.referenceType, refId: m.referenceId })))
+        
+        // Filtrar solo los movimientos que son ventas de embarques
+        const shipmentMovements = movements.filter(m => 
+          m.referenceType === 'shipment' && m.referenceId && m.type === 'abono'
+        )
+
+        console.log('shipmentMovements:', shipmentMovements.length)
+
+        if (shipmentMovements.length > 0) {
+          // Obtener los embarques
+          const shipmentIds = shipmentMovements.map(m => m.referenceId)
+          const shipments = await queryRunner.manager.find(Shipment, {
+            where: { id: In(shipmentIds) },
+            relations: ['receptions']
+          })
+
+          // Obtener todas las recepciones de fruta de esos embarques del productor actual
+          const allReceptionIds: string[] = []
+          for (const shipment of shipments) {
+            const receptionIds = shipment.receptions
+              .filter(r => r.producerId === dto.producerId)
+              .map(r => r.id)
+            allReceptionIds.push(...receptionIds)
+          }
+
+          if (allReceptionIds.length > 0) {
+            const fruitReceptions = await queryRunner.manager.find(FruitReception, {
+              where: { id: In(allReceptionIds) },
+              relations: ['product']  // Cargar la relación con producto
+            })
+
+            console.log('fruitReceptions found:', fruitReceptions.length)
+
+            // Calcular subtotal de las recepciones
+            const subtotal = fruitReceptions.reduce((sum, reception) => 
+              sum + (reception.boxes * reception.pricePerBox), 0
+            )
+            
+            const retentionAmount = dto.retention?.amount || 0
+            const totalToPay = subtotal - retentionAmount  // Calcular correctamente: subtotal - retención
+
+            console.log('Creating payment report:', { subtotal, retentionAmount, totalToPay })
+
+            // Crear el reporte de pago
+            const paymentReport = queryRunner.manager.create(PaymentReport, {
+              code: this.generateCode("PR"),
+              producerId: dto.producerId,
+              date: new Date().toISOString().split('T')[0],
+              subtotal: Number(subtotal.toFixed(2)),
+              retentionAmount: Number(retentionAmount.toFixed(2)),
+              retentionNotes: dto.retention?.notes,
+              totalToPay: Number(totalToPay.toFixed(2)),
+              status: "pagado", // Ya se pagó
+              notes: dto.notes,
+              paymentMethod: dto.method,
+              paidAt: new Date(),
+            })
+            await queryRunner.manager.save(paymentReport)
+
+            console.log('Payment report created:', paymentReport.id)
+
+            // Crear los items del reporte
+            for (const reception of fruitReceptions) {
+              const item = queryRunner.manager.create(PaymentReportItem, {
+                paymentReportId: paymentReport.id,
+                fruitReceptionId: reception.id,
+                boxes: reception.boxes,
+                pricePerBox: reception.pricePerBox,
+                subtotal: reception.boxes * reception.pricePerBox,
+              })
+              await queryRunner.manager.save(item)
+            }
+            
+            console.log('Payment report items created:', fruitReceptions.length)
+          }
+        }
+      }
+
       await queryRunner.commitTransaction()
       return payment
     } catch (error) {
@@ -861,4 +963,177 @@ export class ProducersService {
       await queryRunner.release()
     }
   }
+
+  // Payment Reports
+  async createPaymentReport(dto: CreatePaymentReportDto): Promise<PaymentReport> {
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      // Calcular subtotal
+      const subtotal = dto.items.reduce((sum, item) => sum + (item.boxes * item.pricePerBox), 0)
+      const retentionAmount = dto.retentionAmount || 0
+      const totalToPay = subtotal - retentionAmount
+
+      // Crear reporte de pago
+      const paymentReport = this.paymentReportsRepository.create({
+        code: this.generateCode("PR"),
+        producerId: dto.producerId,
+        date: dto.date || new Date().toISOString().split('T')[0],
+        subtotal: Number(subtotal.toFixed(2)),
+        retentionAmount: Number(retentionAmount.toFixed(2)),
+        retentionNotes: dto.retentionNotes,
+        totalToPay: Number(totalToPay.toFixed(2)),
+        status: "pendiente",
+        notes: dto.notes,
+      })
+      await queryRunner.manager.save(paymentReport)
+
+      // Crear items del reporte
+      for (const itemDto of dto.items) {
+        const item = this.paymentReportItemsRepository.create({
+          paymentReportId: paymentReport.id,
+          fruitReceptionId: itemDto.fruitReceptionId,
+          boxes: itemDto.boxes,
+          pricePerBox: itemDto.pricePerBox,
+          subtotal: Number((itemDto.boxes * itemDto.pricePerBox).toFixed(2)),
+        })
+        await queryRunner.manager.save(item)
+      }
+
+      await queryRunner.commitTransaction()
+
+      return await this.paymentReportsRepository.findOne({
+        where: { id: paymentReport.id },
+        relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+      })
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      throw error
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  async findAllPaymentReports(): Promise<PaymentReport[]> {
+    return await this.paymentReportsRepository.find({
+      relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+      order: { createdAt: "DESC" },
+    })
+  }
+
+  async findOnePaymentReport(id: string): Promise<PaymentReport> {
+    const report = await this.paymentReportsRepository.findOne({
+      where: { id },
+      relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+    })
+
+    if (!report) {
+      throw new NotFoundException(`Payment report with ID ${id} not found`)
+    }
+
+    return report
+  }
+
+  async updatePaymentReport(id: string, dto: CreatePaymentReportDto): Promise<PaymentReport> {
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      const report = await this.paymentReportsRepository.findOne({ 
+        where: { id },
+        relations: ["items"]
+      })
+      
+      if (!report) {
+        throw new NotFoundException(`Payment report with ID ${id} not found`)
+      }
+
+      // No permitir editar si ya está pagado
+      if (report.status === 'pagado') {
+        throw new BadRequestException('Cannot edit payment report that is already paid')
+      }
+
+      // Eliminar items existentes
+      await queryRunner.manager.delete(PaymentReportItem, { paymentReportId: id })
+
+      // Recalcular totales
+      const subtotal = dto.items.reduce((sum, item) => sum + (item.boxes * item.pricePerBox), 0)
+      const retentionAmount = dto.retentionAmount || 0
+      const totalToPay = subtotal - retentionAmount
+
+      // Actualizar reporte
+      report.producerId = dto.producerId
+      report.date = dto.date || report.date
+      report.subtotal = Number(subtotal.toFixed(2))
+      report.retentionAmount = Number(retentionAmount.toFixed(2))
+      report.retentionNotes = dto.retentionNotes
+      report.totalToPay = Number(totalToPay.toFixed(2))
+      report.notes = dto.notes
+      
+      await queryRunner.manager.save(report)
+
+      // Crear nuevos items
+      for (const itemDto of dto.items) {
+        const item = this.paymentReportItemsRepository.create({
+          paymentReportId: report.id,
+          fruitReceptionId: itemDto.fruitReceptionId,
+          boxes: itemDto.boxes,
+          pricePerBox: itemDto.pricePerBox,
+          subtotal: Number((itemDto.boxes * itemDto.pricePerBox).toFixed(2)),
+        })
+        await queryRunner.manager.save(item)
+      }
+
+      await queryRunner.commitTransaction()
+
+      return await this.paymentReportsRepository.findOne({
+        where: { id },
+        relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+      })
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      throw error
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  async updatePaymentReportStatus(id: string, dto: UpdatePaymentReportStatusDto): Promise<PaymentReport> {
+    const report = await this.paymentReportsRepository.findOne({ where: { id } })
+    
+    if (!report) {
+      throw new NotFoundException(`Payment report with ID ${id} not found`)
+    }
+
+    report.status = dto.status
+    if (dto.paymentMethod) report.paymentMethod = dto.paymentMethod
+    if (dto.notes) report.notes = dto.notes
+    if (dto.status === 'pagado') report.paidAt = new Date()
+
+    await this.paymentReportsRepository.save(report)
+
+    return await this.paymentReportsRepository.findOne({
+      where: { id },
+      relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+    })
+  }
+
+  async deletePaymentReport(id: string): Promise<void> {
+    const report = await this.paymentReportsRepository.findOne({ where: { id } })
+    
+    if (!report) {
+      throw new NotFoundException(`Payment report with ID ${id} not found`)
+    }
+
+    // No permitir eliminar si ya está pagado
+    if (report.status === 'pagado') {
+      throw new BadRequestException('Cannot delete payment report that is already paid')
+    }
+
+    await this.paymentReportsRepository.remove(report)
+  }
 }
+

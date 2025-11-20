@@ -6,10 +6,14 @@ import { InputAssignmentItem } from "./entities/input-assignment-item.entity";
 import { FruitReception } from "./entities/fruit-reception.entity";
 import { Shipment } from "./entities/shipment.entity";
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity";
+import { PaymentReport } from "./entities/payment-report.entity";
+import { PaymentReportItem } from "./entities/payment-report-item.entity";
 import type { CreateProducerDto } from "./dto/create-producer.dto";
 import type { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto";
 import type { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto";
 import type { CreateShipmentDto } from "./dto/create-shipment.dto";
+import type { CreatePaymentDto } from "./dto/create-payment.dto";
+import type { CreatePaymentReportDto, UpdatePaymentReportStatusDto } from "./dto/create-payment-report.dto";
 import { InventoryService } from "../inventory/inventory.service";
 export declare class ProducersService {
     private producersRepository;
@@ -18,9 +22,11 @@ export declare class ProducersService {
     private fruitReceptionsRepository;
     private shipmentsRepository;
     private accountMovementsRepository;
+    private paymentReportsRepository;
+    private paymentReportItemsRepository;
     private inventoryService;
     private dataSource;
-    constructor(producersRepository: Repository<Producer>, inputAssignmentsRepository: Repository<InputAssignment>, inputAssignmentItemsRepository: Repository<InputAssignmentItem>, fruitReceptionsRepository: Repository<FruitReception>, shipmentsRepository: Repository<Shipment>, accountMovementsRepository: Repository<ProducerAccountMovement>, inventoryService: InventoryService, dataSource: DataSource);
+    constructor(producersRepository: Repository<Producer>, inputAssignmentsRepository: Repository<InputAssignment>, inputAssignmentItemsRepository: Repository<InputAssignmentItem>, fruitReceptionsRepository: Repository<FruitReception>, shipmentsRepository: Repository<Shipment>, accountMovementsRepository: Repository<ProducerAccountMovement>, paymentReportsRepository: Repository<PaymentReport>, paymentReportItemsRepository: Repository<PaymentReportItem>, inventoryService: InventoryService, dataSource: DataSource);
     private generateCode;
     private generateTrackingFolio;
     create(createProducerDto: CreateProducerDto): Promise<Producer>;
@@ -41,4 +47,32 @@ export declare class ProducersService {
     updateShipmentStatus(id: string, status: 'embarcada' | 'en-transito' | 'recibida' | 'vendida', salePrice?: number): Promise<Shipment>;
     findAllShipments(): Promise<Shipment[]>;
     updateShipment(id: string, dto: Partial<CreateShipmentDto>): Promise<Shipment>;
+    deleteShipment(id: string): Promise<void>;
+    getAccountStatement(producerId: string): Promise<{
+        movements: {
+            balance: number;
+            id: string;
+            producerId: string;
+            producer: Producer;
+            type: "cargo" | "abono" | "pago";
+            amount: number;
+            referenceType: string;
+            referenceId: string;
+            referenceCode: string;
+            description: string;
+            paymentMethod: string;
+            paymentReference: string;
+            evidenceUrl: string;
+            date: string;
+            createdAt: Date;
+        }[];
+        currentBalance: number;
+    }>;
+    createPayment(dto: CreatePaymentDto): Promise<ProducerAccountMovement>;
+    createPaymentReport(dto: CreatePaymentReportDto): Promise<PaymentReport>;
+    findAllPaymentReports(): Promise<PaymentReport[]>;
+    findOnePaymentReport(id: string): Promise<PaymentReport>;
+    updatePaymentReport(id: string, dto: CreatePaymentReportDto): Promise<PaymentReport>;
+    updatePaymentReportStatus(id: string, dto: UpdatePaymentReportStatusDto): Promise<PaymentReport>;
+    deletePaymentReport(id: string): Promise<void>;
 }

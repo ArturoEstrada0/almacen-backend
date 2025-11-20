@@ -6,6 +6,7 @@ import { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto"
 import { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto"
 import { CreateShipmentDto } from "./dto/create-shipment.dto"
 import { CreatePaymentDto } from "./dto/create-payment.dto"
+import { CreatePaymentReportDto, UpdatePaymentReportStatusDto } from "./dto/create-payment-report.dto"
 import { UpdateProducerDto } from "./dto/update-producer.dto"
 
 @ApiTags("producers")
@@ -141,6 +142,48 @@ export class ProducersController {
   @ApiResponse({ status: 201, description: "Payment created" })
   createPayment(@Body() dto: CreatePaymentDto) {
     return this.producersService.createPayment(dto)
+  }
+
+  @Post("payment-reports")
+  @ApiOperation({ summary: "Create payment report" })
+  @ApiResponse({ status: 201, description: "Payment report created" })
+  createPaymentReport(@Body() dto: CreatePaymentReportDto) {
+    return this.producersService.createPaymentReport(dto)
+  }
+
+  @Get("payment-reports/all")
+  @ApiOperation({ summary: "Get all payment reports" })
+  @ApiResponse({ status: 200, description: "List of payment reports" })
+  findAllPaymentReports() {
+    return this.producersService.findAllPaymentReports()
+  }
+
+  @Get("payment-reports/:id")
+  @ApiOperation({ summary: "Get payment report by ID" })
+  @ApiResponse({ status: 200, description: "Payment report details" })
+  findOnePaymentReport(@Param("id", ParseUUIDPipe) id: string) {
+    return this.producersService.findOnePaymentReport(id)
+  }
+
+  @Patch("payment-reports/:id")
+  @ApiOperation({ summary: "Update payment report" })
+  @ApiResponse({ status: 200, description: "Payment report updated" })
+  updatePaymentReport(@Param("id", ParseUUIDPipe) id: string, @Body() dto: CreatePaymentReportDto) {
+    return this.producersService.updatePaymentReport(id, dto)
+  }
+
+  @Patch("payment-reports/:id/status")
+  @ApiOperation({ summary: "Update payment report status" })
+  @ApiResponse({ status: 200, description: "Payment report status updated" })
+  updatePaymentReportStatus(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdatePaymentReportStatusDto) {
+    return this.producersService.updatePaymentReportStatus(id, dto)
+  }
+
+  @Delete("payment-reports/:id")
+  @ApiOperation({ summary: "Delete payment report" })
+  @ApiResponse({ status: 200, description: "Payment report deleted" })
+  deletePaymentReport(@Param("id", ParseUUIDPipe) id: string) {
+    return this.producersService.deletePaymentReport(id)
   }
 
   @Patch(":id")
