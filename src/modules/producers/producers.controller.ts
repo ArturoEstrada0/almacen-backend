@@ -76,6 +76,20 @@ export class ProducersController {
     return this.producersService.findAllFruitReceptions()
   }
 
+  @Patch("fruit-receptions/:id")
+  @ApiOperation({ summary: "Update fruit reception" })
+  @ApiResponse({ status: 200, description: "Fruit reception updated" })
+  updateFruitReception(@Param("id", ParseUUIDPipe) id: string, @Body() dto: CreateFruitReceptionDto) {
+    return this.producersService.updateFruitReception(id, dto)
+  }
+
+  @Delete("fruit-receptions/:id")
+  @ApiOperation({ summary: "Delete fruit reception" })
+  @ApiResponse({ status: 200, description: "Fruit reception deleted" })
+  deleteFruitReception(@Param("id", ParseUUIDPipe) id: string) {
+    return this.producersService.deleteFruitReception(id)
+  }
+
   @Post("shipments")
   @ApiOperation({ summary: "Create shipment" })
   @ApiResponse({ status: 201, description: "Shipment created" })
@@ -99,6 +113,20 @@ export class ProducersController {
     @Body('salePrice') salePrice?: number,
   ) {
     return this.producersService.updateShipmentStatus(id, status, salePrice)
+  }
+
+  @Patch("shipments/:id")
+  @ApiOperation({ summary: "Update shipment" })
+  @ApiResponse({ status: 200, description: "Shipment updated" })
+  updateShipment(@Param("id", ParseUUIDPipe) id: string, @Body() dto: Partial<CreateShipmentDto>) {
+    return this.producersService.updateShipment(id, dto)
+  }
+
+  @Delete("shipments/:id")
+  @ApiOperation({ summary: "Delete shipment" })
+  @ApiResponse({ status: 200, description: "Shipment deleted" })
+  deleteShipment(@Param("id", ParseUUIDPipe) id: string) {
+    return this.producersService.deleteShipment(id)
   }
 
   @Get(':id/account-statement')

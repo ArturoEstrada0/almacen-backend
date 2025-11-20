@@ -19,29 +19,14 @@ export declare class ProducersController {
     }>;
     createFruitReception(dto: CreateFruitReceptionDto): Promise<import("./entities/fruit-reception.entity").FruitReception>;
     findAllFruitReceptions(): Promise<import("./entities/fruit-reception.entity").FruitReception[]>;
+    updateFruitReception(id: string, dto: CreateFruitReceptionDto): Promise<import("./entities/fruit-reception.entity").FruitReception>;
+    deleteFruitReception(id: string): Promise<void>;
     createShipment(dto: CreateShipmentDto): Promise<import("./entities/shipment.entity").Shipment>;
     findAllShipments(): Promise<import("./entities/shipment.entity").Shipment[]>;
     updateShipmentStatus(id: string, status: 'embarcada' | 'recibida' | 'vendida', salePrice?: number): Promise<import("./entities/shipment.entity").Shipment>;
-    getAccountStatement(id: string): Promise<{
-        movements: {
-            balance: number;
-            id: string;
-            producerId: string;
-            producer: import("./entities/producer.entity").Producer;
-            type: "cargo" | "abono" | "pago";
-            amount: number;
-            referenceType: string;
-            referenceId: string;
-            referenceCode: string;
-            description: string;
-            paymentMethod: string;
-            paymentReference: string;
-            evidenceUrl: string;
-            date: string;
-            createdAt: Date;
-        }[];
-        currentBalance: number;
-    }>;
-    createPayment(dto: CreatePaymentDto): Promise<import("./entities/producer-account-movement.entity").ProducerAccountMovement>;
+    updateShipment(id: string, dto: Partial<CreateShipmentDto>): Promise<import("./entities/shipment.entity").Shipment>;
+    deleteShipment(id: string): any;
+    getAccountStatement(id: string): any;
+    createPayment(dto: CreatePaymentDto): any;
     updateProducer(id: string, updateProducerDto: UpdateProducerDto): Promise<import("./entities/producer.entity").Producer>;
 }

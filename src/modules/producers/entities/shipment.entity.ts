@@ -28,6 +28,9 @@ export class Shipment {
   @Column({ nullable: true })
   carrier: string
 
+  @Column({ name: "carrier_contact", nullable: true })
+  carrierContact: string
+
   @Column({ name: "shipped_at", type: "timestamp", nullable: true })
   shippedAt: Date
 

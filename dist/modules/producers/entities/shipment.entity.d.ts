@@ -7,6 +7,7 @@ export declare class Shipment {
     status: "embarcada" | "en-transito" | "recibida" | "vendida";
     totalBoxes: number;
     carrier: string;
+    carrierContact: string;
     shippedAt: Date;
     receivedAt: Date;
     salePricePerBox: number;

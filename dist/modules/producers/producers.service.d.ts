@@ -10,7 +10,6 @@ import type { CreateProducerDto } from "./dto/create-producer.dto";
 import type { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto";
 import type { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto";
 import type { CreateShipmentDto } from "./dto/create-shipment.dto";
-import type { CreatePaymentDto } from "./dto/create-payment.dto";
 import { InventoryService } from "../inventory/inventory.service";
 export declare class ProducersService {
     private producersRepository;
@@ -36,28 +35,10 @@ export declare class ProducersService {
     }>;
     createFruitReception(dto: CreateFruitReceptionDto): Promise<FruitReception>;
     findAllFruitReceptions(): Promise<FruitReception[]>;
+    updateFruitReception(id: string, dto: CreateFruitReceptionDto): Promise<FruitReception>;
+    deleteFruitReception(id: string): Promise<void>;
     createShipment(dto: CreateShipmentDto): Promise<Shipment>;
     updateShipmentStatus(id: string, status: 'embarcada' | 'en-transito' | 'recibida' | 'vendida', salePrice?: number): Promise<Shipment>;
     findAllShipments(): Promise<Shipment[]>;
-    getAccountStatement(producerId: string): Promise<{
-        movements: {
-            balance: number;
-            id: string;
-            producerId: string;
-            producer: Producer;
-            type: "cargo" | "abono" | "pago";
-            amount: number;
-            referenceType: string;
-            referenceId: string;
-            referenceCode: string;
-            description: string;
-            paymentMethod: string;
-            paymentReference: string;
-            evidenceUrl: string;
-            date: string;
-            createdAt: Date;
-        }[];
-        currentBalance: number;
-    }>;
-    createPayment(dto: CreatePaymentDto): Promise<ProducerAccountMovement>;
+    updateShipment(id: string, dto: Partial<CreateShipmentDto>): Promise<Shipment>;
 }

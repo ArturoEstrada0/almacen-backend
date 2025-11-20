@@ -48,6 +48,10 @@ __decorate([
     __metadata("design:type", String)
 ], Shipment.prototype, "carrier", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "carrier_contact", nullable: true }),
+    __metadata("design:type", String)
+], Shipment.prototype, "carrierContact", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: "shipped_at", type: "timestamp", nullable: true }),
     __metadata("design:type", Date)
 ], Shipment.prototype, "shippedAt", void 0);

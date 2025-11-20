@@ -53,6 +53,12 @@ let ProducersController = class ProducersController {
     findAllFruitReceptions() {
         return this.producersService.findAllFruitReceptions();
     }
+    updateFruitReception(id, dto) {
+        return this.producersService.updateFruitReception(id, dto);
+    }
+    deleteFruitReception(id) {
+        return this.producersService.deleteFruitReception(id);
+    }
     createShipment(dto) {
         return this.producersService.createShipment(dto);
     }
@@ -61,6 +67,12 @@ let ProducersController = class ProducersController {
     }
     updateShipmentStatus(id, status, salePrice) {
         return this.producersService.updateShipmentStatus(id, status, salePrice);
+    }
+    updateShipment(id, dto) {
+        return this.producersService.updateShipment(id, dto);
+    }
+    deleteShipment(id) {
+        return this.producersService.deleteShipment(id);
     }
     getAccountStatement(id) {
         return this.producersService.getAccountStatement(id);
@@ -153,6 +165,25 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ProducersController.prototype, "findAllFruitReceptions", null);
 __decorate([
+    (0, common_1.Patch)("fruit-receptions/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Update fruit reception" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Fruit reception updated" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, create_fruit_reception_dto_1.CreateFruitReceptionDto]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "updateFruitReception", null);
+__decorate([
+    (0, common_1.Delete)("fruit-receptions/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Delete fruit reception" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Fruit reception deleted" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "deleteFruitReception", null);
+__decorate([
     (0, common_1.Post)("shipments"),
     (0, swagger_1.ApiOperation)({ summary: "Create shipment" }),
     (0, swagger_1.ApiResponse)({ status: 201, description: "Shipment created" }),
@@ -180,6 +211,25 @@ __decorate([
     __metadata("design:paramtypes", [String, String, Number]),
     __metadata("design:returntype", void 0)
 ], ProducersController.prototype, "updateShipmentStatus", null);
+__decorate([
+    (0, common_1.Patch)("shipments/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Update shipment" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Shipment updated" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "updateShipment", null);
+__decorate([
+    (0, common_1.Delete)("shipments/:id"),
+    (0, swagger_1.ApiOperation)({ summary: "Delete shipment" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: "Shipment deleted" }),
+    __param(0, (0, common_1.Param)("id", common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], ProducersController.prototype, "deleteShipment", null);
 __decorate([
     (0, common_1.Get)(':id/account-statement'),
     (0, swagger_1.ApiOperation)({ summary: 'Get producer account statement' }),

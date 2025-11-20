@@ -456,6 +456,66 @@ export class ProducersService {
     })
   }
 
+  async updateFruitReception(id: string, dto: CreateFruitReceptionDto): Promise<FruitReception> {
+    const reception = await this.fruitReceptionsRepository.findOne({ where: { id } })
+    if (!reception) {
+      throw new NotFoundException(`Fruit reception with ID ${id} not found`)
+    }
+
+    // No permitir editar si ya está embarcada o vendida
+    if (reception.shipmentStatus !== 'pendiente') {
+      throw new BadRequestException('Cannot edit reception that is already shipped or sold')
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      // Actualizar la recepción
+      Object.assign(reception, {
+        producerId: dto.producerId,
+        productId: dto.productId,
+        warehouseId: dto.warehouseId,
+        boxes: dto.boxes,
+        date: dto.date,
+        trackingFolio: dto.trackingFolio,
+        weightPerBox: dto.weightPerBox,
+        totalWeight: dto.totalWeight,
+        returnedBoxes: dto.returnedBoxes || 0,
+        returnedBoxesValue: dto.returnedBoxesValue || 0,
+        notes: dto.notes,
+      })
+
+      await queryRunner.manager.save(reception)
+      await queryRunner.commitTransaction()
+
+      return await this.fruitReceptionsRepository.findOne({
+        where: { id },
+        relations: ["producer", "product", "warehouse"],
+      })
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      throw error
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  async deleteFruitReception(id: string): Promise<void> {
+    const reception = await this.fruitReceptionsRepository.findOne({ where: { id } })
+    if (!reception) {
+      throw new NotFoundException(`Fruit reception with ID ${id} not found`)
+    }
+
+    // No permitir eliminar si ya está embarcada o vendida
+    if (reception.shipmentStatus !== 'pendiente') {
+      throw new BadRequestException('Cannot delete reception that is already shipped or sold')
+    }
+
+    await this.fruitReceptionsRepository.remove(reception)
+  }
+
   // Shipments
   async createShipment(dto: CreateShipmentDto): Promise<Shipment> {
     const queryRunner = this.dataSource.createQueryRunner()
@@ -489,9 +549,9 @@ export class ProducersService {
         totalBoxes: Number(totalBoxes), // Asegurar que sea número
         status: "embarcada",
         carrier: dto.carrier,
+        carrierContact: dto.driver,
         shippedAt: dto.date ? new Date(dto.date) : new Date(),
         notes: dto.notes,
-        // driver no existe en la entidad, se omite
       })
       await queryRunner.manager.save(shipment)
 
@@ -591,6 +651,128 @@ export class ProducersService {
       relations: ["receptions", "receptions.producer", "receptions.product"],
       order: { createdAt: "DESC" },
     })
+  }
+
+  async updateShipment(id: string, dto: Partial<CreateShipmentDto>): Promise<Shipment> {
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      const shipment = await this.shipmentsRepository.findOne({ 
+        where: { id },
+        relations: ["receptions"]
+      })
+      
+      if (!shipment) {
+        throw new NotFoundException(`Shipment with ID ${id} not found`)
+      }
+
+      // No permitir editar si ya está vendido
+      if (shipment.status === 'vendida') {
+        throw new BadRequestException('Cannot edit shipment that is already sold')
+      }
+
+      // Si se proporcionan nuevos receptionIds, actualizar las recepciones
+      if (dto.receptionIds && Array.isArray(dto.receptionIds)) {
+        // Obtener IDs actuales
+        const currentReceptionIds = shipment.receptions.map(r => r.id)
+        
+        // Recepciones a remover (estaban en el embarque pero ya no están seleccionadas)
+        const receptionsToRemove = currentReceptionIds.filter(id => !dto.receptionIds.includes(id))
+        
+        // Recepciones a agregar (están seleccionadas pero no estaban en el embarque)
+        const receptionsToAdd = dto.receptionIds.filter(id => !currentReceptionIds.includes(id))
+        
+        // Remover recepciones del embarque (vuelven a pendiente)
+        for (const receptionId of receptionsToRemove) {
+          const reception = await queryRunner.manager.findOne(FruitReception, { where: { id: receptionId } })
+          if (reception) {
+            reception.shipmentId = null
+            reception.shipmentStatus = 'pendiente'
+            await queryRunner.manager.save(reception)
+          }
+        }
+        
+        // Agregar nuevas recepciones al embarque
+        for (const receptionId of receptionsToAdd) {
+          const reception = await queryRunner.manager.findOne(FruitReception, { where: { id: receptionId } })
+          if (reception) {
+            // Verificar que esté pendiente
+            if (reception.shipmentStatus !== 'pendiente') {
+              throw new BadRequestException(`Reception ${reception.code} is not available for shipment`)
+            }
+            reception.shipmentId = shipment.id
+            reception.shipmentStatus = 'embarcada'
+            await queryRunner.manager.save(reception)
+          }
+        }
+        
+        // Recalcular totalBoxes
+        const allReceptions = await queryRunner.manager.find(FruitReception, { 
+          where: { shipmentId: id } 
+        })
+        shipment.totalBoxes = allReceptions.reduce((sum, r) => sum + Number(r.boxes || 0), 0)
+      }
+
+      // Actualizar campos básicos
+      if (dto.carrier) shipment.carrier = dto.carrier
+      if (dto.driver !== undefined) shipment.carrierContact = dto.driver
+      if (dto.date) shipment.date = dto.date
+      if (dto.notes !== undefined) shipment.notes = dto.notes
+
+      await queryRunner.manager.save(shipment)
+      await queryRunner.commitTransaction()
+
+      return await this.shipmentsRepository.findOne({
+        where: { id },
+        relations: ["receptions", "receptions.producer", "receptions.product"],
+      })
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      throw error
+    } finally {
+      await queryRunner.release()
+    }
+  }
+  }
+
+  async deleteShipment(id: string): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      const shipment = await this.shipmentsRepository.findOne({ 
+        where: { id },
+        relations: ["receptions"]
+      })
+      
+      if (!shipment) {
+        throw new NotFoundException(`Shipment with ID ${id} not found`)
+      }
+
+      // No permitir eliminar si ya está vendido
+      if (shipment.status === 'vendida') {
+        throw new BadRequestException('Cannot delete shipment that is already sold')
+      }
+
+      // Revertir el estado de las recepciones a pendiente
+      for (const reception of shipment.receptions) {
+        reception.shipmentId = null
+        reception.shipmentStatus = 'pendiente'
+        await queryRunner.manager.save(reception)
+      }
+
+      // Eliminar el embarque
+      await queryRunner.manager.remove(shipment)
+      await queryRunner.commitTransaction()
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      throw error
+    } finally {
+      await queryRunner.release()
+    }
   }
 
   // Account Statements
