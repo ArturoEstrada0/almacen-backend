@@ -14,6 +14,10 @@ export declare class PaymentReport {
     paymentMethod: string;
     paymentReference: string;
     paidAt: Date;
+    invoiceUrl: string;
+    receiptUrl: string;
+    paymentComplementUrl: string;
+    isrAmount: number;
     notes: string;
     items: PaymentReportItem[];
     createdAt: Date;

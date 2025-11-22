@@ -48,6 +48,18 @@ export class PaymentReport {
   @Column({ name: "paid_at", type: "timestamp", nullable: true })
   paidAt: Date
 
+  @Column({ name: "invoice_url", nullable: true, length: 500 })
+  invoiceUrl: string
+
+  @Column({ name: "receipt_url", nullable: true, length: 500 })
+  receiptUrl: string
+
+  @Column({ name: "payment_complement_url", nullable: true, length: 500 })
+  paymentComplementUrl: string
+
+  @Column({ name: "isr_amount", type: "decimal", precision: 10, scale: 2, default: 0 })
+  isrAmount: number
+
   @Column({ type: "text", nullable: true })
   notes: string
 

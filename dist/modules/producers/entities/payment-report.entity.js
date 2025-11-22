@@ -74,6 +74,22 @@ __decorate([
     __metadata("design:type", Date)
 ], PaymentReport.prototype, "paidAt", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: "invoice_url", nullable: true, length: 500 }),
+    __metadata("design:type", String)
+], PaymentReport.prototype, "invoiceUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "receipt_url", nullable: true, length: 500 }),
+    __metadata("design:type", String)
+], PaymentReport.prototype, "receiptUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "payment_complement_url", nullable: true, length: 500 }),
+    __metadata("design:type", String)
+], PaymentReport.prototype, "paymentComplementUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "isr_amount", type: "decimal", precision: 10, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], PaymentReport.prototype, "isrAmount", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)
 ], PaymentReport.prototype, "notes", void 0);
