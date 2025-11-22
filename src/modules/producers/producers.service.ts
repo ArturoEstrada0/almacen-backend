@@ -69,14 +69,53 @@ export class ProducersService {
     return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 9000) + 1000}`
   }
 
-  private generateTrackingFolio() {
-    // Formato más simple: año(2 dígitos) + mes + día + contador aleatorio de 3 dígitos
+  private async generateTrackingFolio(): Promise<string> {
+    // Formato: DDMMAA-NNN (día, mes, año de 2 dígitos + número secuencial)
     const now = new Date()
-    const year = now.getFullYear().toString().slice(-2)
-    const month = (now.getMonth() + 1).toString().padStart(2, '0')
     const day = now.getDate().toString().padStart(2, '0')
-    const random = Math.floor(Math.random() * 900 + 100) // 100-999
-    return `${year}${month}${day}-${random}`
+    const month = (now.getMonth() + 1).toString().padStart(2, '0')
+    const year = now.getFullYear().toString().slice(-2)
+    const datePrefix = `${day}${month}${year}`
+    
+    // Buscar el último folio del día en todas las tablas que usan trackingFolio
+    const assignments = await this.inputAssignmentsRepository
+      .createQueryBuilder('assignment')
+      .where('assignment.trackingFolio LIKE :prefix', { prefix: `${datePrefix}-%` })
+      .orderBy('assignment.trackingFolio', 'DESC')
+      .getOne()
+    
+    const receptions = await this.fruitReceptionsRepository
+      .createQueryBuilder('reception')
+      .where('reception.trackingFolio LIKE :prefix', { prefix: `${datePrefix}-%` })
+      .orderBy('reception.trackingFolio', 'DESC')
+      .getOne()
+    
+    const shipments = await this.shipmentsRepository
+      .createQueryBuilder('shipment')
+      .where('shipment.trackingFolio LIKE :prefix', { prefix: `${datePrefix}-%` })
+      .orderBy('shipment.trackingFolio', 'DESC')
+      .getOne()
+    
+    // Obtener todos los folios del día y encontrar el número más alto
+    const allFolios = [
+      assignments?.trackingFolio,
+      receptions?.trackingFolio,
+      shipments?.trackingFolio
+    ].filter(Boolean)
+    
+    let nextNumber = 1
+    if (allFolios.length > 0) {
+      const numbers = allFolios.map(folio => {
+        const parts = folio.split('-')
+        return parts.length > 1 ? parseInt(parts[1], 10) : 0
+      }).filter(num => !isNaN(num))
+      
+      if (numbers.length > 0) {
+        nextNumber = Math.max(...numbers) + 1
+      }
+    }
+    
+    return `${datePrefix}-${nextNumber.toString().padStart(3, '0')}`
   }
 
   // Producers CRUD
@@ -129,7 +168,7 @@ export class ProducersService {
     try {
       const total = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
 
-      const trackingFolio = dto.trackingFolio || this.generateTrackingFolio()
+      const trackingFolio = dto.trackingFolio || await this.generateTrackingFolio()
 
       const assignment = this.inputAssignmentsRepository.create({
         code: this.generateCode("IA"),
