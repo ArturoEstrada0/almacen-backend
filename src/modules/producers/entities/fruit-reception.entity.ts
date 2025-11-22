@@ -66,6 +66,15 @@ export class FruitReception {
   })
   shipmentStatus: "pendiente" | "embarcada" | "vendida"
 
+  @Column({
+    name: "payment_status",
+    type: "enum",
+    enum: ["pendiente", "pagada"],
+    default: "pendiente",
+    nullable: true,
+  })
+  paymentStatus: "pendiente" | "pagada"
+
   @Column({ name: "shipment_id", nullable: true })
   shipmentId: string
 

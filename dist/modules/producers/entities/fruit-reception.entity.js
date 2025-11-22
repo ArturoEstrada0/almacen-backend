@@ -84,6 +84,16 @@ __decorate([
     __metadata("design:type", String)
 ], FruitReception.prototype, "shipmentStatus", void 0);
 __decorate([
+    (0, typeorm_1.Column)({
+        name: "payment_status",
+        type: "enum",
+        enum: ["pendiente", "pagada"],
+        default: "pendiente",
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], FruitReception.prototype, "paymentStatus", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: "shipment_id", nullable: true }),
     __metadata("design:type", String)
 ], FruitReception.prototype, "shipmentId", void 0);

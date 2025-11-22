@@ -1048,6 +1048,14 @@ export class ProducersService {
             }
             
             console.log('Payment report items created:', fruitReceptions.length)
+
+            // Actualizar el estado de las recepciones de fruta a "pagada"
+            for (const reception of fruitReceptions) {
+              reception.paymentStatus = 'pagada'
+              await queryRunner.manager.save(reception)
+            }
+            
+            console.log('Fruit receptions marked as paid:', fruitReceptions.length)
           }
         }
       }

@@ -18,6 +18,7 @@ export declare class FruitReception {
     weightPerBox: number;
     totalWeight: number;
     shipmentStatus: "pendiente" | "embarcada" | "vendida";
+    paymentStatus: "pendiente" | "pagada";
     shipmentId: string;
     shipment: Shipment;
     pricePerBox: number;

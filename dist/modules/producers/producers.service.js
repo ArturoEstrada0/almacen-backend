@@ -826,6 +826,11 @@ let ProducersService = class ProducersService {
                             await queryRunner.manager.save(item);
                         }
                         console.log('Payment report items created:', fruitReceptions.length);
+                        for (const reception of fruitReceptions) {
+                            reception.paymentStatus = 'pagada';
+                            await queryRunner.manager.save(reception);
+                        }
+                        console.log('Fruit receptions marked as paid:', fruitReceptions.length);
                     }
                 }
             }
