@@ -24,6 +24,12 @@ async function runMigrations() {
     await client.query(paymentReportsSQL);
     console.log('✅ payment_reports migration completed');
 
+    // Run payment_reports documents migration
+    console.log('\n📝 Running payment_reports documents migration...');
+    const paymentReportsDocsSQL = fs.readFileSync(path.join(__dirname, 'migration_payment_reports_documents.sql'), 'utf8');
+    await client.query(paymentReportsDocsSQL);
+    console.log('✅ payment_reports documents migration completed');
+
     console.log('\n🎉 All migrations completed successfully!');
   } catch (error) {
     console.error('❌ Migration failed:', error.message);
