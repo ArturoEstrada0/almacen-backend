@@ -6,6 +6,7 @@ import { Producer } from "./entities/producer.entity"
 import { InputAssignment } from "./entities/input-assignment.entity"
 import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
+import { ReturnedItem } from "./entities/returned-item.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
 import { PaymentReport } from "./entities/payment-report.entity"
@@ -19,6 +20,7 @@ import { InventoryModule } from "../inventory/inventory.module"
       InputAssignment,
       InputAssignmentItem,
       FruitReception,
+      ReturnedItem,
       Shipment,
       ProducerAccountMovement,
       PaymentReport,

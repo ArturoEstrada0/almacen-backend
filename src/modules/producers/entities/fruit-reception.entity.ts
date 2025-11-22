@@ -5,12 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from "typeorm"
 import { Producer } from "./producer.entity"
 import { Product } from "../../products/entities/product.entity"
 import { Shipment } from "./shipment.entity"
 import { Warehouse } from "../../warehouses/entities/warehouse.entity"
+import { ReturnedItem } from "./returned-item.entity"
 
 @Entity("fruit_receptions")
 export class FruitReception {
@@ -83,6 +85,9 @@ export class FruitReception {
 
   @Column({ name: "returned_boxes_value", type: "decimal", precision: 10, scale: 2, nullable: true, default: 0 })
   returnedBoxesValue: number
+
+  @OneToMany(() => ReturnedItem, (item) => item.reception, { cascade: true })
+  returnedItems: ReturnedItem[]
 
   @Column({ type: "text", nullable: true })
   notes: string

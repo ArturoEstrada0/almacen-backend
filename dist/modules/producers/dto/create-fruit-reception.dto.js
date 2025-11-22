@@ -9,9 +9,31 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateFruitReceptionDto = void 0;
+exports.CreateFruitReceptionDto = exports.ReturnedItemDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
+class ReturnedItemDto {
+}
+exports.ReturnedItemDto = ReturnedItemDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "uuid" }),
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], ReturnedItemDto.prototype, "productId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 10 }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], ReturnedItemDto.prototype, "quantity", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 50.0 }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], ReturnedItemDto.prototype, "unitPrice", void 0);
 class CreateFruitReceptionDto {
 }
 exports.CreateFruitReceptionDto = CreateFruitReceptionDto;
@@ -89,4 +111,16 @@ __decorate([
     (0, class_validator_1.Min)(0),
     __metadata("design:type", Number)
 ], CreateFruitReceptionDto.prototype, "returnedBoxesValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        type: [ReturnedItemDto],
+        description: "Items devueltos por el productor (insumos o materiales)",
+        required: false
+    }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ReturnedItemDto),
+    __metadata("design:type", Array)
+], CreateFruitReceptionDto.prototype, "returnedItems", void 0);
 //# sourceMappingURL=create-fruit-reception.dto.js.map

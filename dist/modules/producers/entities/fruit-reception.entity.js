@@ -15,6 +15,7 @@ const producer_entity_1 = require("./producer.entity");
 const product_entity_1 = require("../../products/entities/product.entity");
 const shipment_entity_1 = require("./shipment.entity");
 const warehouse_entity_1 = require("../../warehouses/entities/warehouse.entity");
+const returned_item_entity_1 = require("./returned-item.entity");
 let FruitReception = class FruitReception {
 };
 exports.FruitReception = FruitReception;
@@ -107,6 +108,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: "returned_boxes_value", type: "decimal", precision: 10, scale: 2, nullable: true, default: 0 }),
     __metadata("design:type", Number)
 ], FruitReception.prototype, "returnedBoxesValue", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => returned_item_entity_1.ReturnedItem, (item) => item.reception, { cascade: true }),
+    __metadata("design:type", Array)
+], FruitReception.prototype, "returnedItems", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)

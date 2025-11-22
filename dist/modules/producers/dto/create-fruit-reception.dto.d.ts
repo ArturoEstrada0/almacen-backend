@@ -1,3 +1,8 @@
+export declare class ReturnedItemDto {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+}
 export declare class CreateFruitReceptionDto {
     producerId: string;
     productId: string;
@@ -11,4 +16,5 @@ export declare class CreateFruitReceptionDto {
     notes?: string;
     returnedBoxes?: number;
     returnedBoxesValue?: number;
+    returnedItems?: ReturnedItemDto[];
 }

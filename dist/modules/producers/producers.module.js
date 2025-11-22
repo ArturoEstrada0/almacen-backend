@@ -15,6 +15,7 @@ const producer_entity_1 = require("./entities/producer.entity");
 const input_assignment_entity_1 = require("./entities/input-assignment.entity");
 const input_assignment_item_entity_1 = require("./entities/input-assignment-item.entity");
 const fruit_reception_entity_1 = require("./entities/fruit-reception.entity");
+const returned_item_entity_1 = require("./entities/returned-item.entity");
 const shipment_entity_1 = require("./entities/shipment.entity");
 const producer_account_movement_entity_1 = require("./entities/producer-account-movement.entity");
 const payment_report_entity_1 = require("./entities/payment-report.entity");
@@ -31,6 +32,7 @@ exports.ProducersModule = ProducersModule = __decorate([
                 input_assignment_entity_1.InputAssignment,
                 input_assignment_item_entity_1.InputAssignmentItem,
                 fruit_reception_entity_1.FruitReception,
+                returned_item_entity_1.ReturnedItem,
                 shipment_entity_1.Shipment,
                 producer_account_movement_entity_1.ProducerAccountMovement,
                 payment_report_entity_1.PaymentReport,

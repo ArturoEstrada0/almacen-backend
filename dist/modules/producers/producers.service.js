@@ -20,6 +20,7 @@ const producer_entity_1 = require("./entities/producer.entity");
 const input_assignment_entity_1 = require("./entities/input-assignment.entity");
 const input_assignment_item_entity_1 = require("./entities/input-assignment-item.entity");
 const fruit_reception_entity_1 = require("./entities/fruit-reception.entity");
+const returned_item_entity_1 = require("./entities/returned-item.entity");
 const shipment_entity_1 = require("./entities/shipment.entity");
 const producer_account_movement_entity_1 = require("./entities/producer-account-movement.entity");
 const payment_report_entity_1 = require("./entities/payment-report.entity");
@@ -28,11 +29,12 @@ const inventory_service_1 = require("../inventory/inventory.service");
 const create_movement_dto_1 = require("../inventory/dto/create-movement.dto");
 const product_entity_1 = require("../products/entities/product.entity");
 let ProducersService = class ProducersService {
-    constructor(producersRepository, inputAssignmentsRepository, inputAssignmentItemsRepository, fruitReceptionsRepository, shipmentsRepository, accountMovementsRepository, paymentReportsRepository, paymentReportItemsRepository, inventoryService, dataSource) {
+    constructor(producersRepository, inputAssignmentsRepository, inputAssignmentItemsRepository, fruitReceptionsRepository, returnedItemsRepository, shipmentsRepository, accountMovementsRepository, paymentReportsRepository, paymentReportItemsRepository, inventoryService, dataSource) {
         this.producersRepository = producersRepository;
         this.inputAssignmentsRepository = inputAssignmentsRepository;
         this.inputAssignmentItemsRepository = inputAssignmentItemsRepository;
         this.fruitReceptionsRepository = fruitReceptionsRepository;
+        this.returnedItemsRepository = returnedItemsRepository;
         this.shipmentsRepository = shipmentsRepository;
         this.accountMovementsRepository = accountMovementsRepository;
         this.paymentReportsRepository = paymentReportsRepository;
@@ -345,6 +347,19 @@ let ProducersService = class ProducersService {
                 shipmentStatus: "pendiente",
             });
             await queryRunner.manager.save(reception);
+            if (dto.returnedItems && dto.returnedItems.length > 0) {
+                for (const itemDto of dto.returnedItems) {
+                    const total = Number(itemDto.quantity) * Number(itemDto.unitPrice);
+                    const returnedItem = queryRunner.manager.create(returned_item_entity_1.ReturnedItem, {
+                        receptionId: reception.id,
+                        productId: itemDto.productId,
+                        quantity: itemDto.quantity,
+                        unitPrice: itemDto.unitPrice,
+                        total,
+                    });
+                    await queryRunner.manager.save(returnedItem);
+                }
+            }
             await this.inventoryService.createMovement({
                 type: create_movement_dto_1.MovementType.ENTRADA,
                 warehouseId: dto.warehouseId,
@@ -357,7 +372,8 @@ let ProducersService = class ProducersService {
                     },
                 ],
             });
-            if (dto.returnedBoxes && dto.returnedBoxesValue && dto.returnedBoxesValue > 0) {
+            const returnedValue = dto.returnedBoxesValue || 0;
+            if (returnedValue > 0) {
                 const lastMovement = await queryRunner.manager
                     .getRepository(producer_account_movement_entity_1.ProducerAccountMovement)
                     .findOne({
@@ -365,13 +381,28 @@ let ProducersService = class ProducersService {
                     order: { createdAt: 'DESC' },
                 });
                 const currentBalance = Number(lastMovement?.balance || 0);
-                const newBalance = currentBalance + Number(dto.returnedBoxesValue);
+                const newBalance = currentBalance + Number(returnedValue);
+                let description = `Devolución de material/insumos`;
+                if (dto.returnedItems && dto.returnedItems.length > 0) {
+                    const productNames = await Promise.all(dto.returnedItems.slice(0, 2).map(async (item) => {
+                        const product = await queryRunner.manager.findOne(product_entity_1.Product, {
+                            where: { id: item.productId },
+                        });
+                        return product?.name || product?.sku || 'Producto';
+                    }));
+                    const remaining = dto.returnedItems.length - 2;
+                    description += `: ${productNames.join(', ')}${remaining > 0 ? ` y ${remaining} más` : ''}`;
+                }
+                else if (dto.returnedBoxes) {
+                    description += ` - ${dto.returnedBoxes} cajas`;
+                }
+                description += ` (Recepción ${reception.code})`;
                 const accountMovement = queryRunner.manager.create(producer_account_movement_entity_1.ProducerAccountMovement, {
                     producerId: dto.producerId,
                     type: 'abono',
-                    amount: dto.returnedBoxesValue,
+                    amount: returnedValue,
                     balance: newBalance,
-                    description: `Devolución de material de empaque - ${dto.returnedBoxes} cajas (Recepción ${reception.code})`,
+                    description,
                     referenceType: 'fruit_reception',
                     referenceCode: reception.code,
                     date: dto.date || new Date().toISOString().split('T')[0],
@@ -381,7 +412,7 @@ let ProducersService = class ProducersService {
             await queryRunner.commitTransaction();
             return await this.fruitReceptionsRepository.findOne({
                 where: { id: reception.id },
-                relations: ["producer", "product", "warehouse"],
+                relations: ["producer", "product", "warehouse", "returnedItems", "returnedItems.product"],
             });
         }
         catch (error) {
@@ -394,12 +425,15 @@ let ProducersService = class ProducersService {
     }
     async findAllFruitReceptions() {
         return await this.fruitReceptionsRepository.find({
-            relations: ["producer", "product", "warehouse", "shipment"],
+            relations: ["producer", "product", "warehouse", "shipment", "returnedItems", "returnedItems.product"],
             order: { createdAt: "DESC" },
         });
     }
     async updateFruitReception(id, dto) {
-        const reception = await this.fruitReceptionsRepository.findOne({ where: { id } });
+        const reception = await this.fruitReceptionsRepository.findOne({
+            where: { id },
+            relations: ["returnedItems"]
+        });
         if (!reception) {
             throw new common_1.NotFoundException(`Fruit reception with ID ${id} not found`);
         }
@@ -410,6 +444,9 @@ let ProducersService = class ProducersService {
         await queryRunner.connect();
         await queryRunner.startTransaction();
         try {
+            if (reception.returnedItems && reception.returnedItems.length > 0) {
+                await queryRunner.manager.delete(returned_item_entity_1.ReturnedItem, { receptionId: id });
+            }
             Object.assign(reception, {
                 producerId: dto.producerId,
                 productId: dto.productId,
@@ -424,10 +461,23 @@ let ProducersService = class ProducersService {
                 notes: dto.notes,
             });
             await queryRunner.manager.save(reception);
+            if (dto.returnedItems && dto.returnedItems.length > 0) {
+                for (const itemDto of dto.returnedItems) {
+                    const total = Number(itemDto.quantity) * Number(itemDto.unitPrice);
+                    const returnedItem = queryRunner.manager.create(returned_item_entity_1.ReturnedItem, {
+                        receptionId: reception.id,
+                        productId: itemDto.productId,
+                        quantity: itemDto.quantity,
+                        unitPrice: itemDto.unitPrice,
+                        total,
+                    });
+                    await queryRunner.manager.save(returnedItem);
+                }
+            }
             await queryRunner.commitTransaction();
             return await this.fruitReceptionsRepository.findOne({
                 where: { id },
-                relations: ["producer", "product", "warehouse"],
+                relations: ["producer", "product", "warehouse", "returnedItems", "returnedItems.product"],
             });
         }
         catch (error) {
@@ -937,11 +987,12 @@ exports.ProducersService = ProducersService = __decorate([
     __param(1, (0, typeorm_1.InjectRepository)(input_assignment_entity_1.InputAssignment)),
     __param(2, (0, typeorm_1.InjectRepository)(input_assignment_item_entity_1.InputAssignmentItem)),
     __param(3, (0, typeorm_1.InjectRepository)(fruit_reception_entity_1.FruitReception)),
-    __param(4, (0, typeorm_1.InjectRepository)(shipment_entity_1.Shipment)),
-    __param(5, (0, typeorm_1.InjectRepository)(producer_account_movement_entity_1.ProducerAccountMovement)),
-    __param(6, (0, typeorm_1.InjectRepository)(payment_report_entity_1.PaymentReport)),
-    __param(7, (0, typeorm_1.InjectRepository)(payment_report_item_entity_1.PaymentReportItem)),
-    __metadata("design:paramtypes", [Function, Function, Function, Function, Function, Function, Function, Function, inventory_service_1.InventoryService,
+    __param(4, (0, typeorm_1.InjectRepository)(returned_item_entity_1.ReturnedItem)),
+    __param(5, (0, typeorm_1.InjectRepository)(shipment_entity_1.Shipment)),
+    __param(6, (0, typeorm_1.InjectRepository)(producer_account_movement_entity_1.ProducerAccountMovement)),
+    __param(7, (0, typeorm_1.InjectRepository)(payment_report_entity_1.PaymentReport)),
+    __param(8, (0, typeorm_1.InjectRepository)(payment_report_item_entity_1.PaymentReportItem)),
+    __metadata("design:paramtypes", [Function, Function, Function, Function, Function, Function, Function, Function, Function, inventory_service_1.InventoryService,
         typeorm_2.DataSource])
 ], ProducersService);
 //# sourceMappingURL=producers.service.js.map

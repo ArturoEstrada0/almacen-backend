@@ -6,6 +6,7 @@ import { Producer } from "./entities/producer.entity"
 import { InputAssignment } from "./entities/input-assignment.entity"
 import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
+import { ReturnedItem } from "./entities/returned-item.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
 import { PaymentReport } from "./entities/payment-report.entity"
@@ -26,6 +27,7 @@ export class ProducersService {
   private inputAssignmentsRepository: Repository<InputAssignment>
   private inputAssignmentItemsRepository: Repository<InputAssignmentItem>
   private fruitReceptionsRepository: Repository<FruitReception>
+  private returnedItemsRepository: Repository<ReturnedItem>
   private shipmentsRepository: Repository<Shipment>
   private accountMovementsRepository: Repository<ProducerAccountMovement>
   private paymentReportsRepository: Repository<PaymentReport>
@@ -42,6 +44,8 @@ export class ProducersService {
     inputAssignmentItemsRepository: Repository<InputAssignmentItem>,
     @InjectRepository(FruitReception)
     fruitReceptionsRepository: Repository<FruitReception>,
+    @InjectRepository(ReturnedItem)
+    returnedItemsRepository: Repository<ReturnedItem>,
     @InjectRepository(Shipment)
     shipmentsRepository: Repository<Shipment>,
     @InjectRepository(ProducerAccountMovement)
@@ -57,6 +61,7 @@ export class ProducersService {
     this.inputAssignmentsRepository = inputAssignmentsRepository
     this.inputAssignmentItemsRepository = inputAssignmentItemsRepository
     this.fruitReceptionsRepository = fruitReceptionsRepository
+    this.returnedItemsRepository = returnedItemsRepository
     this.shipmentsRepository = shipmentsRepository
     this.accountMovementsRepository = accountMovementsRepository
     this.paymentReportsRepository = paymentReportsRepository
@@ -440,6 +445,21 @@ export class ProducersService {
       })
       await queryRunner.manager.save(reception)
 
+      // Guardar items devueltos si existen
+      if (dto.returnedItems && dto.returnedItems.length > 0) {
+        for (const itemDto of dto.returnedItems) {
+          const total = Number(itemDto.quantity) * Number(itemDto.unitPrice)
+          const returnedItem = queryRunner.manager.create(ReturnedItem, {
+            receptionId: reception.id,
+            productId: itemDto.productId,
+            quantity: itemDto.quantity,
+            unitPrice: itemDto.unitPrice,
+            total,
+          })
+          await queryRunner.manager.save(returnedItem)
+        }
+      }
+
       // Create inventory movement (entrada)
       await this.inventoryService.createMovement({
         type: MovementType.ENTRADA,
@@ -454,8 +474,9 @@ export class ProducersService {
         ],
       })
 
-      // Si hay material de empaque devuelto, crear movimiento de abono
-      if (dto.returnedBoxes && dto.returnedBoxesValue && dto.returnedBoxesValue > 0) {
+      // Si hay items devueltos o valor de devolución, crear movimiento de abono
+      const returnedValue = dto.returnedBoxesValue || 0
+      if (returnedValue > 0) {
         // Obtener el saldo actual del productor
         const lastMovement = await queryRunner.manager
           .getRepository(ProducerAccountMovement)
@@ -465,18 +486,32 @@ export class ProducersService {
           })
 
         const currentBalance = Number(lastMovement?.balance || 0)
-        // La devolución es un abono a favor del productor
-        // Si nos debe (saldo negativo), la devolución reduce lo que nos debe (suma al saldo)
-        // Si le debemos (saldo positivo), la devolución aumenta lo que le debemos (suma al saldo)
-        // En ambos casos SUMA
-        const newBalance = currentBalance + Number(dto.returnedBoxesValue)
+        const newBalance = currentBalance + Number(returnedValue)
+
+        let description = `Devolución de material/insumos`
+        if (dto.returnedItems && dto.returnedItems.length > 0) {
+          // Obtener nombres de productos devueltos
+          const productNames = await Promise.all(
+            dto.returnedItems.slice(0, 2).map(async (item) => {
+              const product = await queryRunner.manager.findOne(Product, {
+                where: { id: item.productId },
+              })
+              return product?.name || product?.sku || 'Producto'
+            })
+          )
+          const remaining = dto.returnedItems.length - 2
+          description += `: ${productNames.join(', ')}${remaining > 0 ? ` y ${remaining} más` : ''}`
+        } else if (dto.returnedBoxes) {
+          description += ` - ${dto.returnedBoxes} cajas`
+        }
+        description += ` (Recepción ${reception.code})`
 
         const accountMovement = queryRunner.manager.create(ProducerAccountMovement, {
           producerId: dto.producerId,
           type: 'abono',
-          amount: dto.returnedBoxesValue,
+          amount: returnedValue,
           balance: newBalance,
-          description: `Devolución de material de empaque - ${dto.returnedBoxes} cajas (Recepción ${reception.code})`,
+          description,
           referenceType: 'fruit_reception',
           referenceCode: reception.code,
           date: dto.date || new Date().toISOString().split('T')[0],
@@ -489,7 +524,7 @@ export class ProducersService {
 
       return await this.fruitReceptionsRepository.findOne({
         where: { id: reception.id },
-        relations: ["producer", "product", "warehouse"],
+        relations: ["producer", "product", "warehouse", "returnedItems", "returnedItems.product"],
       })
     } catch (error) {
       await queryRunner.rollbackTransaction()
@@ -501,13 +536,16 @@ export class ProducersService {
 
   async findAllFruitReceptions(): Promise<FruitReception[]> {
     return await this.fruitReceptionsRepository.find({
-      relations: ["producer", "product", "warehouse", "shipment"],
+      relations: ["producer", "product", "warehouse", "shipment", "returnedItems", "returnedItems.product"],
       order: { createdAt: "DESC" },
     })
   }
 
   async updateFruitReception(id: string, dto: CreateFruitReceptionDto): Promise<FruitReception> {
-    const reception = await this.fruitReceptionsRepository.findOne({ where: { id } })
+    const reception = await this.fruitReceptionsRepository.findOne({ 
+      where: { id },
+      relations: ["returnedItems"]
+    })
     if (!reception) {
       throw new NotFoundException(`Fruit reception with ID ${id} not found`)
     }
@@ -522,6 +560,11 @@ export class ProducersService {
     await queryRunner.startTransaction()
 
     try {
+      // Eliminar items devueltos existentes
+      if (reception.returnedItems && reception.returnedItems.length > 0) {
+        await queryRunner.manager.delete(ReturnedItem, { receptionId: id })
+      }
+
       // Actualizar la recepción
       Object.assign(reception, {
         producerId: dto.producerId,
@@ -538,11 +581,27 @@ export class ProducersService {
       })
 
       await queryRunner.manager.save(reception)
+
+      // Guardar nuevos items devueltos
+      if (dto.returnedItems && dto.returnedItems.length > 0) {
+        for (const itemDto of dto.returnedItems) {
+          const total = Number(itemDto.quantity) * Number(itemDto.unitPrice)
+          const returnedItem = queryRunner.manager.create(ReturnedItem, {
+            receptionId: reception.id,
+            productId: itemDto.productId,
+            quantity: itemDto.quantity,
+            unitPrice: itemDto.unitPrice,
+            total,
+          })
+          await queryRunner.manager.save(returnedItem)
+        }
+      }
+
       await queryRunner.commitTransaction()
 
       return await this.fruitReceptionsRepository.findOne({
         where: { id },
-        relations: ["producer", "product", "warehouse"],
+        relations: ["producer", "product", "warehouse", "returnedItems", "returnedItems.product"],
       })
     } catch (error) {
       await queryRunner.rollbackTransaction()

@@ -2,6 +2,7 @@ import { Producer } from "./producer.entity";
 import { Product } from "../../products/entities/product.entity";
 import { Shipment } from "./shipment.entity";
 import { Warehouse } from "../../warehouses/entities/warehouse.entity";
+import { ReturnedItem } from "./returned-item.entity";
 export declare class FruitReception {
     id: string;
     code: string;
@@ -23,6 +24,7 @@ export declare class FruitReception {
     finalTotal: number;
     returnedBoxes: number;
     returnedBoxesValue: number;
+    returnedItems: ReturnedItem[];
     notes: string;
     createdAt: Date;
     updatedAt: Date;
