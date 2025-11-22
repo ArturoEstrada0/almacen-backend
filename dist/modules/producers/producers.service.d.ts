@@ -70,7 +70,7 @@ export declare class ProducersService {
         }[];
         currentBalance: number;
     }>;
-    createPayment(dto: CreatePaymentDto): Promise<ProducerAccountMovement>;
+    createPayment(dto: CreatePaymentDto): Promise<any>;
     createPaymentReport(dto: CreatePaymentReportDto): Promise<PaymentReport>;
     findAllPaymentReports(): Promise<PaymentReport[]>;
     findOnePaymentReport(id: string): Promise<PaymentReport>;

@@ -79,4 +79,24 @@ export class UpdatePaymentReportStatusDto {
   @IsString()
   @IsOptional()
   notes?: string
+
+  @ApiProperty({ example: "https://.../invoice.pdf", required: false })
+  @IsString()
+  @IsOptional()
+  invoiceUrl?: string
+
+  @ApiProperty({ example: "https://.../receipt.pdf", required: false })
+  @IsString()
+  @IsOptional()
+  receiptUrl?: string
+
+  @ApiProperty({ example: "https://.../complement.pdf", required: false })
+  @IsString()
+  @IsOptional()
+  paymentComplementUrl?: string
+
+  @ApiProperty({ example: 100.00, required: false })
+  @IsNumber()
+  @IsOptional()
+  isrAmount?: number
 }

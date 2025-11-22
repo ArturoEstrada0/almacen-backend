@@ -905,163 +905,134 @@ export class ProducersService {
   }
 
   // Payments
-  async createPayment(dto: CreatePaymentDto): Promise<ProducerAccountMovement> {
+  async createPayment(dto: CreatePaymentDto): Promise<any> {
     const queryRunner = this.dataSource.createQueryRunner()
     await queryRunner.connect()
     await queryRunner.startTransaction()
 
     try {
-      // compute previous balance
-      const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
-        where: { producerId: dto.producerId },
-        order: { createdAt: "DESC" },
-      })
-      const prevBalance = lastMovement ? Number(lastMovement.balance) : 0
-
-      // Si hay movimientos seleccionados, agregar en la descripción
-      let description = `Pago - ${dto.method}`
-      if (dto.selectedMovements && dto.selectedMovements.length > 0) {
-        const movements = await queryRunner.manager.find(ProducerAccountMovement, {
-          where: { id: In(dto.selectedMovements) }
+      // Si no hay movimientos seleccionados, mantener flujo antiguo (crear movimiento de pago simple)
+      if (!dto.selectedMovements || dto.selectedMovements.length === 0) {
+        // compute previous balance
+        const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
+          where: { producerId: dto.producerId },
+          order: { createdAt: "DESC" },
         })
-        const refs = movements.map(m => m.referenceCode).filter(Boolean).slice(0, 3).join(", ")
-        if (refs) {
-          description += ` - Cubre: ${refs}${dto.selectedMovements.length > 3 ? ` y ${dto.selectedMovements.length - 3} más` : ""}`
-        }
-      }
+        const prevBalance = lastMovement ? Number(lastMovement.balance) : 0
 
-      // Registrar el pago
-      // Un pago reduce lo que le debemos al productor
-      let newBalance = prevBalance - Number(dto.amount)
-      const payment = queryRunner.manager.create(ProducerAccountMovement, {
-        producerId: dto.producerId,
-        type: "pago",
-        amount: dto.amount,
-        balance: newBalance,
-        description: description,
-        paymentMethod: dto.method,
-        paymentReference: dto.reference,
-        notes: dto.notes,
-      } as any)
-      await queryRunner.manager.save(payment)
-
-      // Si hay retención, registrar como cargo (reduce lo que le debemos al productor)
-      // La retención es un descuento que aplicamos, entonces reduce el saldo a favor del productor
-      if (dto.retention && dto.retention.amount > 0) {
-        newBalance = newBalance - Number(dto.retention.amount)  // RESTAR la retención
-        const retention = queryRunner.manager.create(ProducerAccountMovement, {
+        // Registrar el pago como movimiento (flujo directo)
+        let description = `Pago - ${dto.method}`
+        const payment = queryRunner.manager.create(ProducerAccountMovement, {
           producerId: dto.producerId,
-          type: "cargo",
-          amount: dto.retention.amount,
-          balance: newBalance,
-          description: `Retención - ${dto.retention.notes || "Descuento aplicado"}`,
-          notes: dto.retention.notes,
+          type: "pago",
+          amount: dto.amount,
+          balance: prevBalance - Number(dto.amount),
+          description,
+          paymentMethod: dto.method,
+          paymentReference: dto.reference,
+          notes: dto.notes,
         } as any)
-        await queryRunner.manager.save(retention)
+        await queryRunner.manager.save(payment)
+
+        // Si hay retención en DTO (flujo directo), registrar como cargo
+        if (dto.retention && dto.retention.amount > 0) {
+          const newBalance = Number(payment.balance) - Number(dto.retention.amount)
+          const retention = queryRunner.manager.create(ProducerAccountMovement, {
+            producerId: dto.producerId,
+            type: "cargo",
+            amount: dto.retention.amount,
+            balance: newBalance,
+            description: `Retención - ${dto.retention.notes || "Descuento aplicado"}`,
+            notes: dto.retention.notes,
+          } as any)
+          await queryRunner.manager.save(retention)
+        }
+
+        await queryRunner.commitTransaction()
+        return payment
       }
 
-      // Crear Reporte de Pago automáticamente
-      // Solo si hay movimientos seleccionados que sean recepciones de fruta
-      console.log('=== PAYMENT REPORT DEBUG ===')
-      console.log('selectedMovements:', dto.selectedMovements)
-      console.log('selectedMovements length:', dto.selectedMovements?.length)
-      
-      if (dto.selectedMovements && dto.selectedMovements.length > 0) {
-        // Obtener los movimientos seleccionados para verificar si son ventas de embarques
-        const movements = await queryRunner.manager.find(ProducerAccountMovement, {
-          where: { id: In(dto.selectedMovements) }
+      // Si hay movimientos seleccionados, crear únicamente un PaymentReport en estado 'pendiente'
+      // Obtener los movimientos seleccionados para verificar si son ventas de embarques
+      const movements = await queryRunner.manager.find(ProducerAccountMovement, {
+        where: { id: In(dto.selectedMovements) }
+      })
+
+      // Filtrar solo los movimientos que son ventas de embarques
+      const shipmentMovements = movements.filter(m => 
+        m.referenceType === 'shipment' && m.referenceId && m.type === 'abono'
+      )
+
+      if (shipmentMovements.length > 0) {
+        // Obtener los embarques
+        const shipmentIds = shipmentMovements.map(m => m.referenceId)
+        const shipments = await queryRunner.manager.find(Shipment, {
+          where: { id: In(shipmentIds) },
+          relations: ['receptions']
         })
-        
-        console.log('movements found:', movements.length)
-        console.log('movements:', movements.map(m => ({ id: m.id, type: m.type, refType: m.referenceType, refId: m.referenceId })))
-        
-        // Filtrar solo los movimientos que son ventas de embarques
-        const shipmentMovements = movements.filter(m => 
-          m.referenceType === 'shipment' && m.referenceId && m.type === 'abono'
-        )
 
-        console.log('shipmentMovements:', shipmentMovements.length)
+        // Obtener todas las recepciones de fruta de esos embarques del productor actual
+        const allReceptionIds: string[] = []
+        for (const shipment of shipments) {
+          const receptionIds = shipment.receptions
+            .filter(r => r.producerId === dto.producerId)
+            .map(r => r.id)
+          allReceptionIds.push(...receptionIds)
+        }
 
-        if (shipmentMovements.length > 0) {
-          // Obtener los embarques
-          const shipmentIds = shipmentMovements.map(m => m.referenceId)
-          const shipments = await queryRunner.manager.find(Shipment, {
-            where: { id: In(shipmentIds) },
-            relations: ['receptions']
+        if (allReceptionIds.length > 0) {
+          const fruitReceptions = await queryRunner.manager.find(FruitReception, {
+            where: { id: In(allReceptionIds) },
+            relations: ['product']
           })
 
-          // Obtener todas las recepciones de fruta de esos embarques del productor actual
-          const allReceptionIds: string[] = []
-          for (const shipment of shipments) {
-            const receptionIds = shipment.receptions
-              .filter(r => r.producerId === dto.producerId)
-              .map(r => r.id)
-            allReceptionIds.push(...receptionIds)
+          // Calcular subtotal de las recepciones
+          const subtotal = fruitReceptions.reduce((sum, reception) => 
+            sum + (reception.boxes * reception.pricePerBox), 0
+          )
+
+          const retentionAmount = dto.retention?.amount || 0
+          const totalToPay = subtotal - retentionAmount
+
+          // Crear el reporte de pago en estado pendiente (no marcamos recepciones como pagadas)
+          const paymentReport = queryRunner.manager.create(PaymentReport, {
+            code: this.generateCode("PR"),
+            producerId: dto.producerId,
+            date: new Date().toISOString().split('T')[0],
+            subtotal: Number(subtotal.toFixed(2)),
+            retentionAmount: Number(retentionAmount.toFixed(2)),
+            retentionNotes: dto.retention?.notes,
+            totalToPay: Number(totalToPay.toFixed(2)),
+            status: "pendiente",
+            notes: dto.notes,
+            paymentMethod: dto.method,
+          })
+          await queryRunner.manager.save(paymentReport)
+
+          // Crear los items del reporte
+          for (const reception of fruitReceptions) {
+            const item = queryRunner.manager.create(PaymentReportItem, {
+              paymentReportId: paymentReport.id,
+              fruitReceptionId: reception.id,
+              boxes: reception.boxes,
+              pricePerBox: reception.pricePerBox,
+              subtotal: reception.boxes * reception.pricePerBox,
+            })
+            await queryRunner.manager.save(item)
           }
 
-          if (allReceptionIds.length > 0) {
-            const fruitReceptions = await queryRunner.manager.find(FruitReception, {
-              where: { id: In(allReceptionIds) },
-              relations: ['product']  // Cargar la relación con producto
-            })
+          await queryRunner.commitTransaction()
 
-            console.log('fruitReceptions found:', fruitReceptions.length)
-
-            // Calcular subtotal de las recepciones
-            const subtotal = fruitReceptions.reduce((sum, reception) => 
-              sum + (reception.boxes * reception.pricePerBox), 0
-            )
-            
-            const retentionAmount = dto.retention?.amount || 0
-            const totalToPay = subtotal - retentionAmount  // Calcular correctamente: subtotal - retención
-
-            console.log('Creating payment report:', { subtotal, retentionAmount, totalToPay })
-
-            // Crear el reporte de pago
-            const paymentReport = queryRunner.manager.create(PaymentReport, {
-              code: this.generateCode("PR"),
-              producerId: dto.producerId,
-              date: new Date().toISOString().split('T')[0],
-              subtotal: Number(subtotal.toFixed(2)),
-              retentionAmount: Number(retentionAmount.toFixed(2)),
-              retentionNotes: dto.retention?.notes,
-              totalToPay: Number(totalToPay.toFixed(2)),
-              status: "pagado", // Ya se pagó
-              notes: dto.notes,
-              paymentMethod: dto.method,
-              paidAt: new Date(),
-            })
-            await queryRunner.manager.save(paymentReport)
-
-            console.log('Payment report created:', paymentReport.id)
-
-            // Crear los items del reporte
-            for (const reception of fruitReceptions) {
-              const item = queryRunner.manager.create(PaymentReportItem, {
-                paymentReportId: paymentReport.id,
-                fruitReceptionId: reception.id,
-                boxes: reception.boxes,
-                pricePerBox: reception.pricePerBox,
-                subtotal: reception.boxes * reception.pricePerBox,
-              })
-              await queryRunner.manager.save(item)
-            }
-            
-            console.log('Payment report items created:', fruitReceptions.length)
-
-            // Actualizar el estado de las recepciones de fruta a "pagada"
-            for (const reception of fruitReceptions) {
-              reception.paymentStatus = 'pagada'
-              await queryRunner.manager.save(reception)
-            }
-            
-            console.log('Fruit receptions marked as paid:', fruitReceptions.length)
-          }
+          return await this.paymentReportsRepository.findOne({
+            where: { id: paymentReport.id },
+            relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+          })
         }
       }
 
+      // Si no aplicó a recepciones de embarque, simplemente devolver success
       await queryRunner.commitTransaction()
-      return payment
+      return { success: true }
     } catch (error) {
       await queryRunner.rollbackTransaction()
       throw error
@@ -1208,12 +1179,127 @@ export class ProducersService {
   }
 
   async updatePaymentReportStatus(id: string, dto: UpdatePaymentReportStatusDto): Promise<PaymentReport> {
-    const report = await this.paymentReportsRepository.findOne({ where: { id } })
-    
+    const report = await this.paymentReportsRepository.findOne({ where: { id }, relations: ["items", "items.fruitReception"] })
+
     if (!report) {
       throw new NotFoundException(`Payment report with ID ${id} not found`)
     }
 
+    // If marking as paid, we must create account movements and apply ISR if provided
+    if (dto.status === 'pagado') {
+      const queryRunner = this.dataSource.createQueryRunner()
+      await queryRunner.connect()
+      await queryRunner.startTransaction()
+
+      try {
+        // Re-fetch report with items and receptions
+        const rpt = await queryRunner.manager.findOne(PaymentReport, { where: { id }, relations: ["items", "items.fruitReception"] })
+        if (!rpt) throw new NotFoundException(`Payment report with ID ${id} not found`) 
+
+        // Calculate totals
+        const subtotal = rpt.subtotal || 0
+        const retentionAmount = rpt.retentionAmount || 0
+        const isrAmount = dto.isrAmount || 0
+
+        // payment amount that will be paid to producer (subtotal - retention - isr)
+        const paymentAmount = Number((subtotal - retentionAmount - isrAmount).toFixed(2))
+
+        // compute previous balance
+        const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
+          where: { producerId: rpt.producerId },
+          order: { createdAt: "DESC" },
+        })
+        let newBalance = lastMovement ? Number(lastMovement.balance) : 0
+
+        // Create payment movement (reduce balance)
+        if (paymentAmount > 0) {
+          newBalance = newBalance - paymentAmount
+          const paymentMove = queryRunner.manager.create(ProducerAccountMovement, {
+            producerId: rpt.producerId,
+            type: "pago",
+            amount: paymentAmount,
+            balance: newBalance,
+            description: `Pago reporte ${rpt.code}`,
+            paymentMethod: dto.paymentMethod,
+            paymentReference: dto.paymentReference,
+            notes: dto.notes,
+            referenceType: 'payment_report',
+            referenceId: rpt.id,
+          } as any)
+          await queryRunner.manager.save(paymentMove)
+        }
+
+        // Create retention movement if any
+        if (retentionAmount > 0) {
+          newBalance = newBalance - retentionAmount
+          const retentionMove = queryRunner.manager.create(ProducerAccountMovement, {
+            producerId: rpt.producerId,
+            type: "cargo",
+            amount: retentionAmount,
+            balance: newBalance,
+            description: `Retención - ${rpt.retentionNotes || "Descuento aplicado"}`,
+            notes: rpt.retentionNotes,
+            referenceType: 'payment_report',
+            referenceId: rpt.id,
+          } as any)
+          await queryRunner.manager.save(retentionMove)
+        }
+
+        // Create ISR movement if any
+        if (isrAmount > 0) {
+          newBalance = newBalance - isrAmount
+          const isrMove = queryRunner.manager.create(ProducerAccountMovement, {
+            producerId: rpt.producerId,
+            type: "cargo",
+            amount: isrAmount,
+            balance: newBalance,
+            description: `ISR retenido - Pago reporte ${rpt.code}`,
+            notes: `ISR retenido: ${isrAmount}`,
+            referenceType: 'payment_report',
+            referenceId: rpt.id,
+          } as any)
+          await queryRunner.manager.save(isrMove)
+        }
+
+        // Update report fields (documents/ISR/status)
+        rpt.status = 'pagado'
+        rpt.paidAt = new Date()
+        if (dto.paymentMethod) rpt.paymentMethod = dto.paymentMethod
+        if (dto.paymentReference) rpt.paymentReference = dto.paymentReference
+        if (dto.notes) rpt.notes = dto.notes
+        if ((dto as any).invoiceUrl) rpt.invoiceUrl = (dto as any).invoiceUrl
+        if ((dto as any).receiptUrl) rpt.receiptUrl = (dto as any).receiptUrl
+        if ((dto as any).paymentComplementUrl) rpt.paymentComplementUrl = (dto as any).paymentComplementUrl
+        if (typeof dto.isrAmount === 'number') rpt.isrAmount = Number(dto.isrAmount.toFixed(2))
+
+        await queryRunner.manager.save(rpt)
+
+        // Mark receptions as paid
+        for (const item of rpt.items || []) {
+          if (item.fruitReception) {
+            const reception = await queryRunner.manager.findOne(FruitReception, { where: { id: item.fruitReception.id } })
+            if (reception) {
+              reception.paymentStatus = 'pagada'
+              await queryRunner.manager.save(reception)
+            }
+          }
+        }
+
+        await queryRunner.commitTransaction()
+
+        return await this.paymentReportsRepository.findOne({
+          where: { id },
+          relations: ["producer", "items", "items.fruitReception", "items.fruitReception.product"],
+        })
+      } catch (error) {
+        await queryRunner.rollbackTransaction()
+        throw error
+      } finally {
+        await queryRunner.release()
+      }
+    }
+
+    // For other status transitions, keep simple save
     report.status = dto.status
     if (dto.paymentMethod) report.paymentMethod = dto.paymentMethod
     if (dto.notes) report.notes = dto.notes

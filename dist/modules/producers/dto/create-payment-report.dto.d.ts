@@ -21,4 +21,8 @@ export declare class UpdatePaymentReportStatusDto {
     paymentMethod?: string;
     paymentReference?: string;
     notes?: string;
+    invoiceUrl?: string;
+    receiptUrl?: string;
+    paymentComplementUrl?: string;
+    isrAmount?: number;
 }

@@ -47,7 +47,7 @@ export declare class ProducersController {
         }[];
         currentBalance: number;
     }>;
-    createPayment(dto: CreatePaymentDto): Promise<import("./entities/producer-account-movement.entity").ProducerAccountMovement>;
+    createPayment(dto: CreatePaymentDto): Promise<any>;
     createPaymentReport(dto: CreatePaymentReportDto): Promise<import("./entities/payment-report.entity").PaymentReport>;
     findAllPaymentReports(): Promise<import("./entities/payment-report.entity").PaymentReport[]>;
     findOnePaymentReport(id: string): Promise<import("./entities/payment-report.entity").PaymentReport>;

@@ -108,4 +108,28 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdatePaymentReportStatusDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "https://.../invoice.pdf", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdatePaymentReportStatusDto.prototype, "invoiceUrl", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "https://.../receipt.pdf", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdatePaymentReportStatusDto.prototype, "receiptUrl", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: "https://.../complement.pdf", required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdatePaymentReportStatusDto.prototype, "paymentComplementUrl", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 100.00, required: false }),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdatePaymentReportStatusDto.prototype, "isrAmount", void 0);
 //# sourceMappingURL=create-payment-report.dto.js.map
