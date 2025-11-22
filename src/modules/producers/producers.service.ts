@@ -17,6 +17,7 @@ import type { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto"
 import type { CreateShipmentDto } from "./dto/create-shipment.dto"
 import type { CreatePaymentDto } from "./dto/create-payment.dto"
 import type { CreatePaymentReportDto, UpdatePaymentReportStatusDto } from "./dto/create-payment-report.dto"
+import { PaymentReportStatus } from "./dto/create-payment-report.dto"
 import { InventoryService } from "../inventory/inventory.service"
 import { MovementType } from "../inventory/dto/create-movement.dto"
 import { Product } from "../products/entities/product.entity"
@@ -1129,7 +1130,7 @@ export class ProducersService {
       }
 
       // No permitir editar si ya está pagado
-      if (report.status === 'pagado') {
+      if (report.status === PaymentReportStatus.PAGADO) {
         throw new BadRequestException('Cannot edit payment report that is already paid')
       }
 
@@ -1186,7 +1187,7 @@ export class ProducersService {
     }
 
     // If marking as paid, we must create account movements and apply ISR if provided
-    if (dto.status === 'pagado') {
+    if (dto.status === PaymentReportStatus.PAGADO) {
       const queryRunner = this.dataSource.createQueryRunner()
       await queryRunner.connect()
       await queryRunner.startTransaction()
@@ -1262,7 +1263,7 @@ export class ProducersService {
         }
 
         // Update report fields (documents/ISR/status)
-        rpt.status = 'pagado'
+        rpt.status = PaymentReportStatus.PAGADO
         rpt.paidAt = new Date()
         if (dto.paymentMethod) rpt.paymentMethod = dto.paymentMethod
         if (dto.paymentReference) rpt.paymentReference = dto.paymentReference
@@ -1303,7 +1304,6 @@ export class ProducersService {
     report.status = dto.status
     if (dto.paymentMethod) report.paymentMethod = dto.paymentMethod
     if (dto.notes) report.notes = dto.notes
-    if (dto.status === 'pagado') report.paidAt = new Date()
 
     await this.paymentReportsRepository.save(report)
 
@@ -1321,7 +1321,7 @@ export class ProducersService {
     }
 
     // No permitir eliminar si ya está pagado
-    if (report.status === 'pagado') {
+    if (report.status === PaymentReportStatus.PAGADO) {
       throw new BadRequestException('Cannot delete payment report that is already paid')
     }
 

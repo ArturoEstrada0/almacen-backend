@@ -25,6 +25,7 @@ const shipment_entity_1 = require("./entities/shipment.entity");
 const producer_account_movement_entity_1 = require("./entities/producer-account-movement.entity");
 const payment_report_entity_1 = require("./entities/payment-report.entity");
 const payment_report_item_entity_1 = require("./entities/payment-report-item.entity");
+const create_payment_report_dto_1 = require("./dto/create-payment-report.dto");
 const inventory_service_1 = require("../inventory/inventory.service");
 const create_movement_dto_1 = require("../inventory/dto/create-movement.dto");
 const product_entity_1 = require("../products/entities/product.entity");
@@ -898,7 +899,7 @@ let ProducersService = class ProducersService {
             if (!report) {
                 throw new common_1.NotFoundException(`Payment report with ID ${id} not found`);
             }
-            if (report.status === 'pagado') {
+            if (report.status === create_payment_report_dto_1.PaymentReportStatus.PAGADO) {
                 throw new common_1.BadRequestException('Cannot edit payment report that is already paid');
             }
             await queryRunner.manager.delete(payment_report_item_entity_1.PaymentReportItem, { paymentReportId: id });
@@ -942,7 +943,7 @@ let ProducersService = class ProducersService {
         if (!report) {
             throw new common_1.NotFoundException(`Payment report with ID ${id} not found`);
         }
-        if (dto.status === 'pagado') {
+        if (dto.status === create_payment_report_dto_1.PaymentReportStatus.PAGADO) {
             const queryRunner = this.dataSource.createQueryRunner();
             await queryRunner.connect();
             await queryRunner.startTransaction();
@@ -1003,7 +1004,7 @@ let ProducersService = class ProducersService {
                     });
                     await queryRunner.manager.save(isrMove);
                 }
-                rpt.status = 'pagado';
+                rpt.status = create_payment_report_dto_1.PaymentReportStatus.PAGADO;
                 rpt.paidAt = new Date();
                 if (dto.paymentMethod)
                     rpt.paymentMethod = dto.paymentMethod;
@@ -1048,8 +1049,6 @@ let ProducersService = class ProducersService {
             report.paymentMethod = dto.paymentMethod;
         if (dto.notes)
             report.notes = dto.notes;
-        if (dto.status === 'pagado')
-            report.paidAt = new Date();
         await this.paymentReportsRepository.save(report);
         return await this.paymentReportsRepository.findOne({
             where: { id },
@@ -1061,7 +1060,7 @@ let ProducersService = class ProducersService {
         if (!report) {
             throw new common_1.NotFoundException(`Payment report with ID ${id} not found`);
         }
-        if (report.status === 'pagado') {
+        if (report.status === create_payment_report_dto_1.PaymentReportStatus.PAGADO) {
             throw new common_1.BadRequestException('Cannot delete payment report that is already paid');
         }
         await this.paymentReportsRepository.remove(report);
