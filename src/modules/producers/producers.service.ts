@@ -891,8 +891,46 @@ export class ProducersService {
       order: { createdAt: "ASC" },
     })
 
+    // Obtener los IDs de los shipments relacionados con movimientos de tipo abono (ventas)
+    const shipmentIds = movements
+      .filter(m => m.referenceType === 'shipment' && m.referenceId)
+      .map(m => m.referenceId)
+      .filter((id, index, self) => self.indexOf(id) === index) // Eliminar duplicados
+
+    // Si hay shipments, obtener las recepciones para verificar su estado de pago
+    let paidShipmentIds: string[] = []
+    if (shipmentIds.length > 0) {
+      const receptions = await this.fruitReceptionsRepository.find({
+        where: { shipmentId: In(shipmentIds) },
+        select: ['id', 'shipmentId', 'paymentStatus']
+      })
+
+      // Agrupar recepciones por shipmentId y verificar si todas están pagadas
+      const shipmentReceptions = shipmentIds.map(shipmentId => ({
+        shipmentId,
+        receptions: receptions.filter(r => r.shipmentId === shipmentId)
+      }))
+
+      // Un shipment está completamente pagado si TODAS sus recepciones están pagadas
+      paidShipmentIds = shipmentReceptions
+        .filter(sr => sr.receptions.length > 0 && sr.receptions.every(r => r.paymentStatus === 'pagada'))
+        .map(sr => sr.shipmentId)
+    }
+
+    // Filtrar movimientos: excluir ventas de shipments que ya están completamente pagados
+    const filteredMovements = movements.filter(movement => {
+      // Si es un movimiento de venta (abono de shipment) y el shipment está pagado, excluirlo
+      if (movement.referenceType === 'shipment' && 
+          movement.referenceId && 
+          paidShipmentIds.includes(movement.referenceId) &&
+          movement.type === 'abono') {
+        return false
+      }
+      return true
+    })
+
     // Use the balance already stored in each movement
-    const movementsWithBalance = movements.map((movement) => ({
+    const movementsWithBalance = filteredMovements.map((movement) => ({
       ...movement,
       balance: Number(movement.balance),
     }))

@@ -713,7 +713,34 @@ let ProducersService = class ProducersService {
             where: { producerId },
             order: { createdAt: "ASC" },
         });
-        const movementsWithBalance = movements.map((movement) => ({
+        const shipmentIds = movements
+            .filter(m => m.referenceType === 'shipment' && m.referenceId)
+            .map(m => m.referenceId)
+            .filter((id, index, self) => self.indexOf(id) === index);
+        let paidShipmentIds = [];
+        if (shipmentIds.length > 0) {
+            const receptions = await this.fruitReceptionsRepository.find({
+                where: { shipmentId: (0, typeorm_2.In)(shipmentIds) },
+                select: ['id', 'shipmentId', 'paymentStatus']
+            });
+            const shipmentReceptions = shipmentIds.map(shipmentId => ({
+                shipmentId,
+                receptions: receptions.filter(r => r.shipmentId === shipmentId)
+            }));
+            paidShipmentIds = shipmentReceptions
+                .filter(sr => sr.receptions.length > 0 && sr.receptions.every(r => r.paymentStatus === 'pagada'))
+                .map(sr => sr.shipmentId);
+        }
+        const filteredMovements = movements.filter(movement => {
+            if (movement.referenceType === 'shipment' &&
+                movement.referenceId &&
+                paidShipmentIds.includes(movement.referenceId) &&
+                movement.type === 'abono') {
+                return false;
+            }
+            return true;
+        });
+        const movementsWithBalance = filteredMovements.map((movement) => ({
             ...movement,
             balance: Number(movement.balance),
         }));
