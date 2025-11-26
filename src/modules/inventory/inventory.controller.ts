@@ -15,6 +15,13 @@ export class InventoryController {
     return this.inventoryService.getInventory(warehouseId)
   }
 
+  @Get('low-stock')
+  @ApiOperation({ summary: 'Get products with low stock' })
+  @ApiResponse({ status: 200, description: 'List of products with low stock' })
+  getLowStockProducts(@Query('warehouseId') warehouseId?: string) {
+    return this.inventoryService.getLowStockProducts(warehouseId);
+  }
+
   @Get('product/:productId')
   @ApiOperation({ summary: 'Get inventory by product' })
   @ApiResponse({ status: 200, description: 'Inventory items for product' })
