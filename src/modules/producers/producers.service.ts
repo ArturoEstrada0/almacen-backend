@@ -461,7 +461,7 @@ export class ProducersService {
         }
       }
 
-      // Create inventory movement (entrada)
+      // Create inventory movement (entrada) - Incrementa el stock de almacén de frutas
       await this.inventoryService.createMovement({
         type: MovementType.ENTRADA,
         warehouseId: dto.warehouseId,
@@ -475,6 +475,11 @@ export class ProducersService {
         ],
       })
 
+      // NOTA IMPORTANTE: Las cajas asignadas al productor que fueron usadas para empacar la fruta
+      // NO se regresan al almacén - van a merma. Solo las cajas devueltas sin usar (returnedItems)
+      // generan movimiento de entrada al almacén de insumos.
+      // La cantidad de cajas usadas es implícita: dto.boxes de fruta recibida = cajas usadas para empacar
+      
       // Si hay items devueltos o valor de devolución, crear movimiento de abono
       const returnedValue = dto.returnedBoxesValue || 0
       if (returnedValue > 0) {
@@ -669,6 +674,40 @@ export class ProducersService {
         reception.shipmentId = shipment.id
         reception.shipmentStatus = "embarcada"
         await queryRunner.manager.save(reception)
+      }
+
+      // Crear movimiento de salida del almacén de frutas - Descuenta el stock cuando se embarcan
+      // Agrupamos por producto y warehouseId para crear un movimiento por cada combinación
+      const movementsByWarehouse = new Map<string, Map<string, number>>()
+      
+      for (const reception of receptions) {
+        const warehouseId = reception.warehouseId
+        const productId = reception.productId
+        const boxes = Number(reception.boxes)
+        
+        if (!movementsByWarehouse.has(warehouseId)) {
+          movementsByWarehouse.set(warehouseId, new Map())
+        }
+        
+        const warehouseProducts = movementsByWarehouse.get(warehouseId)!
+        const currentQty = warehouseProducts.get(productId) || 0
+        warehouseProducts.set(productId, currentQty + boxes)
+      }
+
+      // Crear un movimiento de salida por cada almacén
+      for (const [warehouseId, products] of movementsByWarehouse) {
+        const items = Array.from(products.entries()).map(([productId, quantity]) => ({
+          productId,
+          quantity,
+        }))
+
+        await this.inventoryService.createMovement({
+          type: MovementType.SALIDA,
+          warehouseId,
+          reference: `Embarque ${shipment.code}`,
+          notes: `Salida de ${totalBoxes} cajas por embarque`,
+          items,
+        })
       }
 
       await queryRunner.commitTransaction()
@@ -940,6 +979,148 @@ export class ProducersService {
     return {
       movements: movementsWithBalance,
       currentBalance,
+    }
+  }
+
+  // Complete Producer Report
+  async getProducerReport(producerId: string) {
+    // Obtener información del productor
+    const producer = await this.producersRepository.findOne({
+      where: { id: producerId },
+    })
+
+    if (!producer) {
+      throw new NotFoundException(`Producer with ID ${producerId} not found`)
+    }
+
+    // Obtener asignaciones de insumos
+    const inputAssignments = await this.inputAssignmentsRepository.find({
+      where: { producerId },
+      relations: ['items', 'items.product', 'warehouse'],
+      order: { createdAt: 'DESC' },
+    })
+
+    // Obtener recepciones de fruta
+    const fruitReceptions = await this.fruitReceptionsRepository.find({
+      where: { producerId },
+      relations: ['product', 'warehouse', 'shipment', 'returnedItems', 'returnedItems.product'],
+      order: { createdAt: 'DESC' },
+    })
+
+    // Obtener embarques relacionados
+    const shipmentIds = [...new Set(fruitReceptions.map(r => r.shipmentId).filter(Boolean))]
+    const shipments = shipmentIds.length > 0
+      ? await this.shipmentsRepository.find({
+          where: { id: In(shipmentIds as string[]) },
+          relations: ['receptions', 'receptions.product'],
+        })
+      : []
+
+    // Obtener estado de cuenta
+    const accountStatement = await this.getAccountStatement(producerId)
+
+    // Calcular resúmenes
+    const totalAssigned = inputAssignments.reduce((sum, a) => sum + Number(a.total), 0)
+    const totalBoxesReceived = fruitReceptions.reduce((sum, r) => sum + Number(r.boxes), 0)
+    const totalBoxesShipped = shipments.reduce((sum, s) => sum + Number(s.totalBoxes || 0), 0)
+    const totalSales = shipments
+      .filter(s => s.status === 'vendida' && s.totalSale)
+      .reduce((sum, s) => sum + Number(s.totalSale), 0)
+    
+    const totalPaid = accountStatement.movements
+      .filter(m => m.type === 'pago')
+      .reduce((sum, m) => sum + Math.abs(Number(m.amount)), 0)
+
+    return {
+      producer: {
+        id: producer.id,
+        code: producer.code,
+        name: producer.name,
+        rfc: producer.rfc,
+        phone: producer.phone,
+        email: producer.email,
+        address: producer.address,
+        accountBalance: Number(producer.accountBalance),
+      },
+      summary: {
+        totalAssigned,
+        totalBoxesReceived,
+        totalBoxesShipped,
+        totalSales,
+        totalPaid,
+        currentBalance: accountStatement.currentBalance,
+      },
+      inputAssignments: inputAssignments.map(a => ({
+        id: a.id,
+        code: a.code,
+        trackingFolio: a.trackingFolio,
+        date: a.date,
+        total: Number(a.total),
+        warehouse: a.warehouse?.name,
+        items: a.items.map(item => ({
+          product: item.product?.name || item.product?.sku,
+          quantity: Number(item.quantity),
+          price: Number(item.price),
+          total: Number(item.total),
+        })),
+        notes: a.notes,
+      })),
+      fruitReceptions: fruitReceptions.map(r => ({
+        id: r.id,
+        code: r.code,
+        trackingFolio: r.trackingFolio,
+        date: r.date,
+        product: r.product?.name || r.product?.sku,
+        boxes: Number(r.boxes),
+        weightPerBox: r.weightPerBox ? Number(r.weightPerBox) : null,
+        totalWeight: r.totalWeight ? Number(r.totalWeight) : null,
+        warehouse: r.warehouse?.name,
+        shipmentStatus: r.shipmentStatus,
+        paymentStatus: r.paymentStatus,
+        pricePerBox: r.pricePerBox ? Number(r.pricePerBox) : null,
+        finalTotal: r.finalTotal ? Number(r.finalTotal) : null,
+        returnedBoxes: r.returnedBoxes ? Number(r.returnedBoxes) : 0,
+        returnedBoxesValue: r.returnedBoxesValue ? Number(r.returnedBoxesValue) : 0,
+        returnedItems: r.returnedItems?.map(item => ({
+          product: item.product?.name || 'Producto',
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          total: Number(item.total),
+        })) || [],
+        notes: r.notes,
+      })),
+      shipments: shipments.map(s => ({
+        id: s.id,
+        code: s.code,
+        trackingFolio: s.trackingFolio,
+        date: s.date,
+        totalBoxes: Number(s.totalBoxes || 0),
+        status: s.status,
+        salePricePerBox: s.salePricePerBox ? Number(s.salePricePerBox) : null,
+        totalSale: s.totalSale ? Number(s.totalSale) : null,
+        carrier: s.carrier,
+        carrierContact: s.carrierContact,
+        notes: s.notes,
+        receptions: s.receptions
+          ?.filter(r => r.producerId === producerId)
+          .map(r => ({
+            code: r.code,
+            product: r.product?.name,
+            boxes: Number(r.boxes),
+            pricePerBox: r.pricePerBox ? Number(r.pricePerBox) : null,
+            finalTotal: r.finalTotal ? Number(r.finalTotal) : null,
+          })) || [],
+      })),
+      accountMovements: accountStatement.movements.map(m => ({
+        date: m.date,
+        type: m.type,
+        amount: Number(m.amount),
+        balance: Number(m.balance),
+        description: m.description,
+        referenceType: m.referenceType,
+        referenceCode: m.referenceCode,
+      })),
+      generatedAt: new Date().toISOString(),
     }
   }
 

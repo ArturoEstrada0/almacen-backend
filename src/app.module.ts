@@ -12,6 +12,8 @@ import { ProducersModule } from "./modules/producers/producers.module"
 import { QuotationsModule } from "./modules/quotations/quotations.module"
 import { AuthModule } from "./modules/auth/auth.module"
 import { ImportsModule } from "./modules/imports/imports.module"
+import { DashboardModule } from "./modules/dashboard/dashboard.module"
+import { UsersModule } from "./modules/users/users.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
@@ -53,6 +55,8 @@ import { ImportsModule } from "./modules/imports/imports.module"
       },
     }),
     AuthModule,
+    DashboardModule,
+    UsersModule,
     ProductsModule,
   CategoriesModule,
   UnitsModule,

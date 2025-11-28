@@ -38,6 +38,20 @@ export class InventoryService {
     })
   }
 
+  async getLowStockProducts(warehouseId?: string) {
+    const qb = this.inventoryRepository
+      .createQueryBuilder("inventory")
+      .leftJoinAndSelect("inventory.product", "product")
+      .leftJoinAndSelect("inventory.warehouse", "warehouse")
+      .where("inventory.quantity <= COALESCE(inventory.reorderPoint, inventory.minStock, 0)");
+
+    if (warehouseId) {
+      qb.andWhere("inventory.warehouseId = :warehouseId", { warehouseId });
+    }
+
+    return await qb.getMany();
+  }
+
   async createMovement(createMovementDto: CreateMovementDto): Promise<Movement> {
     // Basic validations for transfers
     if (createMovementDto.type === MovementType.TRASPASO) {

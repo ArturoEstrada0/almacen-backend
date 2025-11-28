@@ -137,6 +137,13 @@ export class ProducersController {
     return this.producersService.getAccountStatement(id);
   }
 
+  @Get(':id/report')
+  @ApiOperation({ summary: 'Get complete producer report for printing/delivery' })
+  @ApiResponse({ status: 200, description: 'Complete producer report' })
+  getProducerReport(@Param('id', ParseUUIDPipe) id: string) {
+    return this.producersService.getProducerReport(id);
+  }
+
   @Post("payments")
   @ApiOperation({ summary: "Create payment" })
   @ApiResponse({ status: 201, description: "Payment created" })
