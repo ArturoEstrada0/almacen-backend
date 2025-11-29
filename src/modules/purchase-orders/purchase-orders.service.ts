@@ -148,6 +148,11 @@ export class PurchaseOrdersService {
     po.paymentStatus = (purchaseOrder as any).paymentStatus || "pendiente"
     po.amountPaid = (purchaseOrder as any).amountPaid !== undefined ? Number((purchaseOrder as any).amountPaid) : 0
     po.creditDays = (purchaseOrder as any).paymentTerms || 0
+    
+    // Convertir campos decimales a números
+    po.total = (purchaseOrder as any).total !== undefined ? Number((purchaseOrder as any).total) : 0
+    po.subtotal = (purchaseOrder as any).subtotal !== undefined ? Number((purchaseOrder as any).subtotal) : 0
+    po.tax = (purchaseOrder as any).tax !== undefined ? Number((purchaseOrder as any).tax) : 0
 
     // Map item fields (provide unitPrice alongside DB 'price' string)
     po.items = (purchaseOrder.items || []).map((it: any) => ({
