@@ -5,6 +5,7 @@ import { DataSource } from "typeorm"
 import { PurchaseOrder } from "./entities/purchase-order.entity"
 import { PurchaseOrderItem } from "./entities/purchase-order-item.entity"
 import { type CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto"
+import { type RegisterPaymentDto } from "./dto/register-payment.dto"
 import { InventoryService } from "../inventory/inventory.service"
 import { MovementType } from "../inventory/dto/create-movement.dto"
 
@@ -32,6 +33,11 @@ export class PurchaseOrdersService {
       // Ensure required fields and defaults
       const generatedCode = (createPurchaseOrderDto as any).orderNumber || `OC-${Date.now()}`
       const orderDate = new Date()
+      
+      // Calculate due date based on credit days
+      const creditDays = createPurchaseOrderDto.creditDays || 0
+      const dueDate = new Date(orderDate)
+      dueDate.setDate(dueDate.getDate() + creditDays)
 
       // Create purchase order (exclude items to avoid cascade inserting incomplete item objects)
       const { items: dtoItems, ...purchaseOrderFields } = createPurchaseOrderDto as any
@@ -42,6 +48,8 @@ export class PurchaseOrdersService {
         date: orderDate,
         status: "pendiente",
         total,
+        paymentTerms: creditDays,
+        dueDate,
       } as any)
 
       await queryRunner.manager.save(purchaseOrder as any)
@@ -137,6 +145,9 @@ export class PurchaseOrdersService {
     po.orderNumber = (purchaseOrder as any).code
     po.orderDate = (purchaseOrder as any).date
     po.expectedDeliveryDate = (purchaseOrder as any).expectedDate ?? null
+    po.paymentStatus = (purchaseOrder as any).paymentStatus || "pendiente"
+    po.amountPaid = (purchaseOrder as any).amountPaid !== undefined ? Number((purchaseOrder as any).amountPaid) : 0
+    po.creditDays = (purchaseOrder as any).paymentTerms || 0
 
     // Map item fields (provide unitPrice alongside DB 'price' string)
     po.items = (purchaseOrder.items || []).map((it: any) => ({
@@ -226,6 +237,38 @@ export class PurchaseOrdersService {
     await this.purchaseOrdersRepository.save(purchaseOrder as any)
 
     // Return mapped response expected by frontend
+    return this.mapPurchaseOrder(purchaseOrder) as any
+  }
+
+  async registerPayment(id: string, registerPaymentDto: RegisterPaymentDto): Promise<PurchaseOrder> {
+    const purchaseOrder = await this.loadEntity(id)
+    
+    // Calcular nuevo monto pagado
+    const currentAmountPaid = Number(purchaseOrder.amountPaid) || 0
+    const newAmountPaid = currentAmountPaid + Number(registerPaymentDto.amount)
+    const total = Number(purchaseOrder.total)
+
+    // Validar que no se pague más del total
+    if (newAmountPaid > total) {
+      throw new BadRequestException(`El monto total pagado ($${newAmountPaid}) excede el total de la orden ($${total})`)
+    }
+
+    // Actualizar monto pagado
+    ;(purchaseOrder as any).amountPaid = newAmountPaid
+
+    // Actualizar estado de pago
+    if (newAmountPaid >= total) {
+      ;(purchaseOrder as any).paymentStatus = "pagado"
+    } else if (newAmountPaid > 0) {
+      ;(purchaseOrder as any).paymentStatus = "parcial"
+    } else {
+      ;(purchaseOrder as any).paymentStatus = "pendiente"
+    }
+
+    await this.purchaseOrdersRepository.save(purchaseOrder as any)
+
+    this.logger.log(`Payment registered for order ${id}: $${registerPaymentDto.amount}. Total paid: $${newAmountPaid}/${total}`)
+
     return this.mapPurchaseOrder(purchaseOrder) as any
   }
 }

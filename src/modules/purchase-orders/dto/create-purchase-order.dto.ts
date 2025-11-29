@@ -56,6 +56,12 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   notes?: string
 
+  @ApiProperty({ example: 30, required: false, description: "Días de crédito para el pago" })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  creditDays?: number
+
   @ApiProperty({ type: [CreatePurchaseOrderItemDto] })
   @IsArray()
   @ValidateNested({ each: true })

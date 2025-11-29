@@ -58,6 +58,14 @@ export class PurchaseOrder {
   @Column({ name: "amount_paid", type: "decimal", precision: 10, scale: 2, default: 0 })
   amountPaid: number
 
+  @Column({
+    name: "payment_status",
+    type: "varchar",
+    length: 20,
+    default: "pendiente",
+  })
+  paymentStatus: "pendiente" | "parcial" | "pagado"
+
   @Column({ type: "text", nullable: true })
   notes: string
 

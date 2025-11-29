@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Patch, ParseUUIDPipe } from "@nestj
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger"
 import { PurchaseOrdersService } from "./purchase-orders.service"
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto"
+import { RegisterPaymentDto } from "./dto/register-payment.dto"
 
 @ApiTags("purchase-orders")
 @Controller("purchase-orders")
@@ -45,5 +46,15 @@ export class PurchaseOrdersController {
   @ApiResponse({ status: 200, description: 'Purchase order cancelled' })
   cancel(@Param('id', ParseUUIDPipe) id: string) {
     return this.purchaseOrdersService.cancel(id);
+  }
+
+  @Post(':id/payment')
+  @ApiOperation({ summary: 'Register a payment for a purchase order' })
+  @ApiResponse({ status: 200, description: 'Payment registered successfully' })
+  registerPayment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() registerPaymentDto: RegisterPaymentDto,
+  ) {
+    return this.purchaseOrdersService.registerPayment(id, registerPaymentDto)
   }
 }
