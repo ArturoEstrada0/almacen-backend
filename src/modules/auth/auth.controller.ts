@@ -23,20 +23,21 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Registrar un nuevo usuario' })
-  @ApiResponse({
-    status: 201,
-    description: 'Usuario registrado exitosamente',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Error en el registro (email duplicado, etc.)',
-  })
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
-  }
+  // Endpoint deshabilitado - El registro de usuarios solo se hace desde el panel de administración
+  // @Post('register')
+  // @HttpCode(HttpStatus.CREATED)
+  // @ApiOperation({ summary: 'Registrar un nuevo usuario' })
+  // @ApiResponse({
+  //   status: 201,
+  //   description: 'Usuario registrado exitosamente',
+  // })
+  // @ApiResponse({
+  //   status: 400,
+  //   description: 'Error en el registro (email duplicado, etc.)',
+  // })
+  // async register(@Body() registerDto: RegisterDto) {
+  //   return this.authService.register(registerDto);
+  // }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)

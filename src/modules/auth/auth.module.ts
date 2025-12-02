@@ -13,7 +13,7 @@ import supabaseConfig from '../../config/supabase.config';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.SUPABASE_JWT_SECRET,
-      signOptions: { expiresIn: '1h' },
+      signOptions: {}, // Sin expiración
     }),
   ],
   controllers: [AuthController],

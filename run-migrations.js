@@ -36,6 +36,12 @@ async function runMigrations() {
     await client.query(paymentStatusSQL);
     console.log('✅ payment_status migration completed');
 
+    // Run contact_name migration
+    console.log('\n📝 Running contact_name migration...');
+    const contactNameSQL = fs.readFileSync(path.join(__dirname, 'migration_add_contact_name.sql'), 'utf8');
+    await client.query(contactNameSQL);
+    console.log('✅ contact_name migration completed');
+
     console.log('\n🎉 All migrations completed successfully!');
   } catch (error) {
     console.error('❌ Migration failed:', error.message);
