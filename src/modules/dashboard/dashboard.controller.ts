@@ -16,4 +16,11 @@ export class DashboardController {
   async getKPIs() {
     return this.dashboardService.getKPIs();
   }
+
+  @Get('profit-report')
+  @ApiOperation({ summary: 'Obtener reporte de utilidades reales' })
+  @ApiResponse({ status: 200, description: 'Reporte de utilidades generado' })
+  async getProfitReport() {
+    return this.dashboardService.getProfitReport();
+  }
 }
