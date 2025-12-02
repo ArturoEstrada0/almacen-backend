@@ -32,6 +32,9 @@ export class Producer {
   @Column({ nullable: true })
   email: string
 
+  @Column({ name: "contact_name", nullable: true })
+  contactName: string
+
   @Column({ name: "account_balance", type: "decimal", precision: 10, scale: 2, default: 0 })
   accountBalance: number
 

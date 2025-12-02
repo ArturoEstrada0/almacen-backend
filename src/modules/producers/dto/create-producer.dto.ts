@@ -31,4 +31,19 @@ export class CreateProducerDto {
   @IsString()
   @IsOptional()
   taxId?: string
+
+  @ApiProperty({ example: "Guadalajara", required: false })
+  @IsString()
+  @IsOptional()
+  city?: string
+
+  @ApiProperty({ example: "Jalisco", required: false })
+  @IsString()
+  @IsOptional()
+  state?: string
+
+  @ApiProperty({ example: "Juan Pérez García", required: false })
+  @IsString()
+  @IsOptional()
+  contactName?: string
 }

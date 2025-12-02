@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm"
 import type { Repository } from "typeorm"
 import { Product } from "./entities/product.entity"
 import { ProductSupplier } from "./entities/product-supplier.entity"
+import { InventoryItem } from "../inventory/entities/inventory-item.entity"
 import type { CreateProductDto } from "./dto/create-product.dto"
 import type { UpdateProductDto } from "./dto/update-product.dto"
 
@@ -13,6 +14,8 @@ export class ProductsService {
     private productsRepository: Repository<Product>,
     @InjectRepository(ProductSupplier)
     private productSuppliersRepository: Repository<ProductSupplier>,
+    @InjectRepository(InventoryItem)
+    private inventoryRepository: Repository<InventoryItem>,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
@@ -74,8 +77,37 @@ export class ProductsService {
 
   async update(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
     const product = await this.findOne(id)
-    Object.assign(product, updateProductDto)
-    return await this.productsRepository.save(product)
+    
+    // Extraer currentStock y warehouseId antes de asignar al producto
+    const { currentStock, warehouseId, ...productData } = updateProductDto
+    
+    Object.assign(product, productData)
+    const updatedProduct = await this.productsRepository.save(product)
+    
+    // Si se proporciona currentStock, actualizar el inventario
+    if (currentStock !== undefined && warehouseId) {
+      let inventoryItem = await this.inventoryRepository.findOne({
+        where: { productId: id, warehouseId },
+      })
+      
+      if (!inventoryItem) {
+        // Crear nuevo registro de inventario si no existe
+        inventoryItem = this.inventoryRepository.create({
+          productId: id,
+          warehouseId,
+          quantity: currentStock,
+          minStock: 0,
+          maxStock: 1000,
+          reorderPoint: 0,
+        })
+      } else {
+        inventoryItem.quantity = currentStock
+      }
+      
+      await this.inventoryRepository.save(inventoryItem)
+    }
+    
+    return updatedProduct
   }
 
   async remove(id: string): Promise<void> {
