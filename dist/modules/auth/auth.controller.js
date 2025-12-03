@@ -22,9 +22,6 @@ let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
     }
-    async register(registerDto) {
-        return this.authService.register(registerDto);
-    }
     async login(loginDto) {
         return this.authService.login(loginDto);
     }
@@ -48,23 +45,6 @@ let AuthController = class AuthController {
     }
 };
 exports.AuthController = AuthController;
-__decorate([
-    (0, common_1.Post)('register'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    (0, swagger_1.ApiOperation)({ summary: 'Registrar un nuevo usuario' }),
-    (0, swagger_1.ApiResponse)({
-        status: 201,
-        description: 'Usuario registrado exitosamente',
-    }),
-    (0, swagger_1.ApiResponse)({
-        status: 400,
-        description: 'Error en el registro (email duplicado, etc.)',
-    }),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [dto_1.RegisterDto]),
-    __metadata("design:returntype", Promise)
-], AuthController.prototype, "register", null);
 __decorate([
     (0, common_1.Post)('login'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

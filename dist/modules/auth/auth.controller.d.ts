@@ -1,13 +1,8 @@
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, RequestPasswordResetDto, ResetPasswordDto } from './dto';
+import { LoginDto, RequestPasswordResetDto, ResetPasswordDto } from './dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
-    register(registerDto: RegisterDto): Promise<{
-        user: import("@supabase/auth-js").User;
-        session: import("@supabase/auth-js").Session;
-        message: string;
-    }>;
     login(loginDto: LoginDto): Promise<{
         user: import("@supabase/auth-js").User;
         session: import("@supabase/auth-js").Session;
