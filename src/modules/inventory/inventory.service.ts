@@ -251,8 +251,17 @@ export class InventoryService {
     return movement
   }
 
-  async updateInventorySettings(productId: string, body: { warehouseId: string; minStock?: number; maxStock?: number; reorderPoint?: number; locationId?: string }) {
-    const { warehouseId, minStock, maxStock, reorderPoint, locationId } = body
+  async updateInventorySettings(productId: string, body: { 
+    warehouseId: string
+    quantity?: number
+    minStock?: number
+    maxStock?: number
+    reorderPoint?: number
+    locationId?: string
+    lotNumber?: string
+    expirationDate?: Date | string
+  }) {
+    const { warehouseId, quantity, minStock, maxStock, reorderPoint, locationId, lotNumber, expirationDate } = body
 
     const where: any = { productId }
     if (warehouseId) where.warehouseId = warehouseId
@@ -267,16 +276,21 @@ export class InventoryService {
         productId,
         warehouseId,
         locationCode: locationId || null,
-        quantity: 0,
+        quantity: quantity ?? 0,
         minStock: minStock ?? 0,
         maxStock: maxStock ?? 0,
         reorderPoint: reorderPoint ?? 0,
+        lotNumber: lotNumber || null,
+        expirationDate: expirationDate ? new Date(expirationDate) : null,
       } as any) as unknown) as InventoryItem
     } else {
+      if (quantity !== undefined) inventoryItem.quantity = quantity
       if (minStock !== undefined) inventoryItem.minStock = minStock
       if (maxStock !== undefined) inventoryItem.maxStock = maxStock
       if (reorderPoint !== undefined) inventoryItem.reorderPoint = reorderPoint
       if (locationId !== undefined) inventoryItem.locationCode = locationId
+      if (lotNumber !== undefined) inventoryItem.lotNumber = lotNumber
+      if (expirationDate !== undefined) inventoryItem.expirationDate = expirationDate ? new Date(expirationDate) : null
     }
 
     return await this.inventoryRepository.save(inventoryItem)

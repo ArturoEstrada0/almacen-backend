@@ -48,7 +48,16 @@ export class InventoryController {
   @ApiResponse({ status: 200, description: 'Inventory item updated' })
   updateInventory(
     @Param('productId', ParseUUIDPipe) productId: string,
-    @Body() body: { warehouseId: string; minStock?: number; maxStock?: number; reorderPoint?: number; locationId?: string },
+    @Body() body: { 
+      warehouseId: string
+      quantity?: number
+      minStock?: number
+      maxStock?: number
+      reorderPoint?: number
+      locationId?: string
+      lotNumber?: string
+      expirationDate?: Date | string
+    },
   ) {
     return this.inventoryService.updateInventorySettings(productId, body)
   }
@@ -59,7 +68,16 @@ export class InventoryController {
   @ApiResponse({ status: 200, description: 'Inventory item updated' })
   updateInventoryCompat(
     @Param('productId', ParseUUIDPipe) productId: string,
-    @Body() body: { warehouseId: string; minStock?: number; maxStock?: number; reorderPoint?: number; locationId?: string },
+    @Body() body: { 
+      warehouseId: string
+      quantity?: number
+      minStock?: number
+      maxStock?: number
+      reorderPoint?: number
+      locationId?: string
+      lotNumber?: string
+      expirationDate?: Date | string
+    },
   ) {
     return this.inventoryService.updateInventorySettings(productId, body)
   }

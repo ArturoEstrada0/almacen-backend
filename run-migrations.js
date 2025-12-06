@@ -42,6 +42,12 @@ async function runMigrations() {
     await client.query(contactNameSQL);
     console.log('✅ contact_name migration completed');
 
+    // Run inventory fields migration
+    console.log('\n📝 Running inventory fields migration...');
+    const inventoryFieldsSQL = fs.readFileSync(path.join(__dirname, 'migration_add_inventory_fields.sql'), 'utf8');
+    await client.query(inventoryFieldsSQL);
+    console.log('✅ inventory fields migration completed');
+
     console.log('\n🎉 All migrations completed successfully!');
   } catch (error) {
     console.error('❌ Migration failed:', error.message);

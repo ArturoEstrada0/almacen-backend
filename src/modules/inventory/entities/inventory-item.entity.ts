@@ -46,6 +46,12 @@ export class InventoryItem {
   @Column({ name: "location_code", nullable: true })
   locationCode: string
 
+  @Column({ name: "lot_number", nullable: true, length: 100 })
+  lotNumber: string
+
+  @Column({ name: "expiration_date", nullable: true, type: "date" })
+  expirationDate: Date
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date
 
