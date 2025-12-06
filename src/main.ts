@@ -3,6 +3,7 @@ import * as dns from 'dns'
 import { ValidationPipe } from "@nestjs/common"
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger"
 import { AppModule } from "./app.module"
+import { HttpExceptionFilter } from "./common/filters/http-exception.filter"
 
 async function bootstrap() {
   // Force DNS to prefer IPv4 addresses first to avoid ENETUNREACH when the
@@ -20,6 +21,9 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule)
+
+  // Global exception filter para manejo de errores amigable
+  app.useGlobalFilters(new HttpExceptionFilter())
 
   // Global validation pipe
   app.useGlobalPipes(
