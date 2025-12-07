@@ -47,6 +47,18 @@ export class WarehousesService {
     return warehouse
   }
 
+  async findByCode(code: string): Promise<Warehouse> {
+    const warehouse = await this.warehousesRepository.findOne({
+      where: { code },
+    })
+
+    if (!warehouse) {
+      throw new NotFoundException(`Warehouse with code ${code} not found`)
+    }
+
+    return warehouse
+  }
+
   async update(id: string, updateWarehouseDto: UpdateWarehouseDto): Promise<Warehouse> {
     const warehouse = await this.findOne(id)
     Object.assign(warehouse, updateWarehouseDto)
