@@ -14,6 +14,7 @@ import { AuthModule } from "./modules/auth/auth.module"
 import { ImportsModule } from "./modules/imports/imports.module"
 import { DashboardModule } from "./modules/dashboard/dashboard.module"
 import { UsersModule } from "./modules/users/users.module"
+import { NotificationsModule } from "./modules/notifications/notifications.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
@@ -57,6 +58,7 @@ import { UsersModule } from "./modules/users/users.module"
     AuthModule,
     DashboardModule,
     UsersModule,
+    NotificationsModule,
     ProductsModule,
   CategoriesModule,
   UnitsModule,

@@ -32,8 +32,10 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/platform-socket.io": "^10.4.20",
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/typeorm": "^10.0.1",
+    "@nestjs/websockets": "^10.4.20",
     "@supabase/supabase-js": "^2.85.0",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
@@ -44,6 +46,7 @@
     "pg": "^8.11.3",
     "reflect-metadata": "^0.2.1",
     "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1",
     "sqlite3": "^5.1.7",
     "typeorm": "^0.3.19",
     "xlsx": "^0.18.5"
