@@ -4,10 +4,13 @@ import { Repository, Between } from "typeorm"
 import * as XLSX from "xlsx"
 import { ProductsService } from "../products/products.service"
 import { WarehousesService } from "../warehouses/warehouses.service"
+import { ProducersService } from "../producers/producers.service"
 import { Product } from "../products/entities/product.entity"
 import { InventoryItem } from "../inventory/entities/inventory-item.entity"
 import { Movement } from "../inventory/entities/movement.entity"
 import { Supplier } from "../suppliers/entities/supplier.entity"
+import { Producer } from "../producers/entities/producer.entity"
+import { Warehouse } from "../warehouses/entities/warehouse.entity"
 import type { ExportProductsDto, ExportInventoryDto, ExportMovementsDto, ExportSuppliersDto } from "./dto/export-query.dto"
 
 @Injectable()
@@ -15,6 +18,7 @@ export class ImportsService {
   constructor(
     private readonly productsService: ProductsService,
     private readonly warehousesService: WarehousesService,
+    private readonly producersService: ProducersService,
     @InjectRepository(Product)
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(InventoryItem)
@@ -23,6 +27,10 @@ export class ImportsService {
     private readonly movementsRepository: Repository<Movement>,
     @InjectRepository(Supplier)
     private readonly suppliersRepository: Repository<Supplier>,
+    @InjectRepository(Producer)
+    private readonly producersRepository: Repository<Producer>,
+    @InjectRepository(Warehouse)
+    private readonly warehousesRepository: Repository<Warehouse>,
   ) {}
 
   async importFile(buffer: Buffer, mapping: Record<string, string>, type: string, sheetName?: string) {
@@ -170,6 +178,229 @@ export class ImportsService {
           if (mapping['email']) dto.email = String(row[headers.indexOf(mapping['email'])] ?? '').trim()
 
           await this.warehousesService.create(dto)
+          result.success++
+        } else if (type === 'input-assignments') {
+          // Importación de asignación de insumos
+          const producerCol = mapping['producer']
+          const warehouseCol = mapping['warehouse']
+          const dateCol = mapping['date']
+          const skuCol = mapping['sku']
+          const quantityCol = mapping['quantity']
+          const priceCol = mapping['unitPrice']
+
+          if (!producerCol || !warehouseCol || !skuCol || !quantityCol || !priceCol) {
+            throw new Error('Productor, Almacén, SKU, Cantidad o Precio mapping missing')
+          }
+
+          const producerCode = String(row[headers.indexOf(producerCol)] ?? '').trim()
+          const warehouseCode = String(row[headers.indexOf(warehouseCol)] ?? '').trim()
+          const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
+          const quantity = Number(row[headers.indexOf(quantityCol)] ?? 0)
+          const unitPrice = Number(row[headers.indexOf(priceCol)] ?? 0)
+
+          if (!producerCode || !warehouseCode || !sku) {
+            throw new Error('Productor, Almacén o SKU vacío')
+          }
+
+          // Buscar productor por código o nombre
+          const producer = await this.producersRepository.findOne({ 
+            where: [
+              { code: producerCode },
+              { name: producerCode }
+            ]
+          })
+          if (!producer) throw new Error(`Productor ${producerCode} no encontrado`)
+
+          // Buscar almacén
+          const warehouse = await this.warehousesService.findByCode(warehouseCode)
+          if (!warehouse) throw new Error(`Almacén ${warehouseCode} no encontrado`)
+
+          // Buscar producto
+          const product = await this.productsRepository.findOne({ where: { sku } })
+          if (!product) throw new Error(`Producto con SKU ${sku} no encontrado`)
+
+          // Obtener fecha
+          let assignmentDate = new Date().toISOString().split('T')[0]
+          if (dateCol) {
+            const dateValue = row[headers.indexOf(dateCol)]
+            if (dateValue) {
+              if (typeof dateValue === 'number') {
+                // Excel serial date
+                const excelDate = new Date((dateValue - 25569) * 86400 * 1000)
+                assignmentDate = excelDate.toISOString().split('T')[0]
+              } else {
+                assignmentDate = new Date(dateValue).toISOString().split('T')[0]
+              }
+            }
+          }
+
+          // Notas opcionales
+          let notes = ''
+          if (mapping['notes']) {
+            notes = String(row[headers.indexOf(mapping['notes'])] ?? '').trim()
+          }
+
+          // Crear asignación de insumos
+          await this.producersService.createInputAssignment({
+            producerId: producer.id,
+            warehouseId: warehouse.id,
+            date: assignmentDate,
+            notes,
+            items: [{
+              productId: product.id,
+              quantity,
+              unitPrice,
+            }],
+          })
+          result.success++
+        } else if (type === 'fruit-receptions') {
+          // Importación de recepción de fruta
+          const producerCol = mapping['producer']
+          const warehouseCol = mapping['warehouse']
+          const productCol = mapping['product']
+          const dateCol = mapping['date']
+          const boxesCol = mapping['boxes']
+
+          if (!producerCol || !warehouseCol || !productCol || !boxesCol) {
+            throw new Error('Productor, Almacén, Producto o Cajas mapping missing')
+          }
+
+          const producerCode = String(row[headers.indexOf(producerCol)] ?? '').trim()
+          const warehouseCode = String(row[headers.indexOf(warehouseCol)] ?? '').trim()
+          const productSku = String(row[headers.indexOf(productCol)] ?? '').trim()
+          const boxes = Number(row[headers.indexOf(boxesCol)] ?? 0)
+
+          if (!producerCode || !warehouseCode || !productSku || boxes <= 0) {
+            throw new Error('Datos incompletos o cajas inválidas')
+          }
+
+          // Buscar productor
+          const producer = await this.producersRepository.findOne({ 
+            where: [
+              { code: producerCode },
+              { name: producerCode }
+            ]
+          })
+          if (!producer) throw new Error(`Productor ${producerCode} no encontrado`)
+
+          // Buscar almacén
+          const warehouse = await this.warehousesService.findByCode(warehouseCode)
+          if (!warehouse) throw new Error(`Almacén ${warehouseCode} no encontrado`)
+
+          // Buscar producto
+          const product = await this.productsRepository.findOne({ where: { sku: productSku } })
+          if (!product) throw new Error(`Producto con SKU ${productSku} no encontrado`)
+
+          // Obtener fecha
+          let receptionDate = new Date().toISOString().split('T')[0]
+          if (dateCol) {
+            const dateValue = row[headers.indexOf(dateCol)]
+            if (dateValue) {
+              if (typeof dateValue === 'number') {
+                const excelDate = new Date((dateValue - 25569) * 86400 * 1000)
+                receptionDate = excelDate.toISOString().split('T')[0]
+              } else {
+                receptionDate = new Date(dateValue).toISOString().split('T')[0]
+              }
+            }
+          }
+
+          // Campos opcionales
+          let weightPerBox = null
+          let totalWeight = null
+          let notes = ''
+
+          if (mapping['weightPerBox']) {
+            weightPerBox = Number(row[headers.indexOf(mapping['weightPerBox'])] ?? 0) || null
+          }
+          if (mapping['totalWeight']) {
+            totalWeight = Number(row[headers.indexOf(mapping['totalWeight'])] ?? 0) || null
+          }
+          if (mapping['notes']) {
+            notes = String(row[headers.indexOf(mapping['notes'])] ?? '').trim()
+          }
+
+          // Crear recepción de fruta
+          await this.producersService.createFruitReception({
+            producerId: producer.id,
+            warehouseId: warehouse.id,
+            productId: product.id,
+            date: receptionDate,
+            boxes,
+            weightPerBox,
+            totalWeight,
+            notes,
+          })
+          result.success++
+        } else if (type === 'initial-stock') {
+          // Carga inicial de inventario por almacén (sin crear movimiento)
+          const skuCol = mapping['sku']
+          const warehouseCol = mapping['warehouse']
+          const quantityCol = mapping['quantity']
+          
+          if (!skuCol || !warehouseCol || !quantityCol) {
+            throw new Error('SKU, Almacén o Cantidad mapping missing')
+          }
+
+          const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
+          const warehouseCode = String(row[headers.indexOf(warehouseCol)] ?? '').trim()
+          const quantity = Number(row[headers.indexOf(quantityCol)] ?? 0)
+
+          if (!sku || !warehouseCode) throw new Error('SKU o Almacén vacío')
+
+          const product = await this.productsRepository.findOne({ where: { sku } })
+          if (!product) throw new Error(`Producto con SKU ${sku} no encontrado`)
+
+          const warehouse = await this.warehousesService.findByCode(warehouseCode)
+          if (!warehouse) throw new Error(`Almacén ${warehouseCode} no encontrado`)
+
+          let inventoryItem = await this.inventoryRepository.findOne({
+            where: { productId: product.id, warehouseId: warehouse.id }
+          })
+
+          if (inventoryItem) {
+            inventoryItem.quantity = quantity
+          } else {
+            inventoryItem = this.inventoryRepository.create({
+              productId: product.id,
+              warehouseId: warehouse.id,
+              quantity,
+              minStock: 0,
+              maxStock: 0,
+              reorderPoint: 0,
+            })
+          }
+
+          // Campos opcionales
+          if (mapping['location']) {
+            const location = String(row[headers.indexOf(mapping['location'])] ?? '').trim()
+            if (location) inventoryItem.locationCode = location
+          }
+          if (mapping['lotNumber']) {
+            const lotNumber = String(row[headers.indexOf(mapping['lotNumber'])] ?? '').trim()
+            if (lotNumber) inventoryItem.lotNumber = lotNumber
+          }
+          if (mapping['expirationDate']) {
+            const expDate = row[headers.indexOf(mapping['expirationDate'])]
+            if (expDate) {
+              if (typeof expDate === 'number') {
+                inventoryItem.expirationDate = new Date((expDate - 25569) * 86400 * 1000)
+              } else {
+                inventoryItem.expirationDate = new Date(expDate)
+              }
+            }
+          }
+          if (mapping['minStock']) {
+            inventoryItem.minStock = Number(row[headers.indexOf(mapping['minStock'])] ?? 0)
+          }
+          if (mapping['maxStock']) {
+            inventoryItem.maxStock = Number(row[headers.indexOf(mapping['maxStock'])] ?? 0)
+          }
+          if (mapping['reorderPoint']) {
+            inventoryItem.reorderPoint = Number(row[headers.indexOf(mapping['reorderPoint'])] ?? 0)
+          }
+
+          await this.inventoryRepository.save(inventoryItem)
           result.success++
         } else {
           throw new Error('Unsupported import type')
@@ -389,6 +620,48 @@ export class ImportsService {
           Notas: "Nota de ejemplo",
         }]
         sheetName = "Movimientos"
+        break
+
+      case "input-assignments":
+        data = [{
+          Productor: "PROD-001 (código o nombre)",
+          Almacén: "ALM-01",
+          Fecha: "01/01/2025",
+          SKU: "INS-001",
+          Cantidad: 50,
+          "Precio Unitario": 10.50,
+          Notas: "Asignación de ejemplo",
+        }]
+        sheetName = "Asignación Insumos"
+        break
+
+      case "fruit-receptions":
+        data = [{
+          Productor: "PROD-001 (código o nombre)",
+          Almacén: "ALM-01",
+          Producto: "FRUTA-001",
+          Fecha: "01/01/2025",
+          Cajas: 100,
+          "Peso por Caja": 18.5,
+          "Peso Total": 1850,
+          Notas: "Recepción de ejemplo",
+        }]
+        sheetName = "Recepción Fruta"
+        break
+
+      case "initial-stock":
+        data = [{
+          SKU: "PROD-001",
+          Almacén: "ALM-01",
+          Cantidad: 100,
+          Ubicación: "A-1-1",
+          Lote: "LOTE-001",
+          Vencimiento: "31/12/2025",
+          "Stock Mínimo": 10,
+          "Stock Máximo": 500,
+          "Punto de Reorden": 50,
+        }]
+        sheetName = "Carga Inicial"
         break
 
       default:
