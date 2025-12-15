@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm"
 import { ProductSupplier } from "../../products/entities/product-supplier.entity"
-import { Quotation } from "../../quotations/entities/quotation.entity"
 
 @Entity("suppliers")
 export class Supplier {
@@ -71,12 +70,6 @@ export class Supplier {
     (ps) => ps.supplier,
   )
   productSuppliers: ProductSupplier[]
-
-  @OneToMany(
-    () => Quotation,
-    (quotation) => quotation.supplier,
-  )
-  quotations: Quotation[]
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date

@@ -4,12 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
   OneToMany,
-  JoinColumn,
 } from "typeorm"
-import { Supplier } from "../../suppliers/entities/supplier.entity"
 import { QuotationItem } from "./quotation-item.entity"
+import { QuotationSupplierToken } from "./quotation-supplier-token.entity"
 
 @Entity("quotations")
 export class Quotation {
@@ -19,19 +17,15 @@ export class Quotation {
   @Column({ unique: true })
   code: string
 
-  @Column({ name: "supplier_id" })
-  supplierId: string
-
-  @ManyToOne(() => Supplier)
-  @JoinColumn({ name: "supplier_id" })
-  supplier: Supplier
+  @Column({ type: "text", nullable: true })
+  description: string
 
   @Column({
     type: "enum",
-    enum: ["pendiente", "enviada", "respondida", "ganadora", "rechazada"],
-    default: "pendiente",
+    enum: ["borrador", "pendiente", "enviada", "parcial", "completada", "cerrada", "cancelada"],
+    default: "borrador",
   })
-  status: "pendiente" | "enviada" | "respondida" | "ganadora" | "rechazada"
+  status: "borrador" | "pendiente" | "enviada" | "parcial" | "completada" | "cerrada" | "cancelada"
 
   @Column({ type: "date" })
   date: Date
@@ -39,17 +33,11 @@ export class Quotation {
   @Column({ name: "valid_until", type: "date", nullable: true })
   validUntil: Date
 
-  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
-  total: number
-
   @Column({ type: "text", nullable: true })
   notes: string
 
-  @Column({ name: "email_sent", default: false })
-  emailSent: boolean
-
-  @Column({ name: "email_sent_at", type: "timestamp", nullable: true })
-  emailSentAt: Date
+  @Column({ name: "winning_supplier_id", nullable: true })
+  winningSupplierId: string
 
   @Column({ name: "purchase_order_id", nullable: true })
   purchaseOrderId: string
@@ -60,6 +48,12 @@ export class Quotation {
     { cascade: true },
   )
   items: QuotationItem[]
+
+  @OneToMany(
+    () => QuotationSupplierToken,
+    (token) => token.quotation,
+  )
+  supplierTokens: QuotationSupplierToken[]
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date

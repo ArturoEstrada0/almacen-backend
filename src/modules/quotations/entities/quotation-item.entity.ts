@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from "typeorm"
 import { Quotation } from "./quotation.entity"
 import { Product } from "../../products/entities/product.entity"
+import { QuotationSupplierResponse } from "./quotation-supplier-response.entity"
 
 @Entity("quotation_items")
 export class QuotationItem {
@@ -27,12 +28,12 @@ export class QuotationItem {
   @Column({ type: "decimal", precision: 10, scale: 2 })
   quantity: number
 
-  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  price: number
-
-  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  total: number
-
   @Column({ type: "text", nullable: true })
   notes: string
+
+  @OneToMany(
+    () => QuotationSupplierResponse,
+    (response) => response.quotationItem,
+  )
+  supplierResponses: QuotationSupplierResponse[]
 }
