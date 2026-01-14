@@ -622,37 +622,136 @@ export class ImportsService {
 
     const receptions = await qb.orderBy("reception.date", "DESC").getMany()
 
+    // Primero, determinar el máximo de productos por categoría en todas las recepciones
+    let maxCajas = 0
+    let maxClams = 0
+    let maxTarimas = 0
+    let maxInterlocks = 0
+    let maxOtros = 0
+
+    if (query.includeReturnedItems) {
+      receptions.forEach(reception => {
+        if (reception.returnedItems && reception.returnedItems.length > 0) {
+          let cajaCount = 0, clamCount = 0, tarimaCount = 0, interlockCount = 0, otroCount = 0
+
+          reception.returnedItems.forEach((item: any) => {
+            const productSku = (item.product?.sku || "").toLowerCase()
+            const productName = (item.product?.name || "").toLowerCase()
+
+            if (productSku.includes("caja") || productName.includes("caja")) {
+              cajaCount++
+            } else if (productSku.includes("clam") || productName.includes("clam")) {
+              clamCount++
+            } else if (productSku.includes("tarima") || productName.includes("tarima")) {
+              tarimaCount++
+            } else if (productSku.includes("interlock") || productName.includes("interlock")) {
+              interlockCount++
+            } else {
+              otroCount++
+            }
+          })
+
+          maxCajas = Math.max(maxCajas, cajaCount)
+          maxClams = Math.max(maxClams, clamCount)
+          maxTarimas = Math.max(maxTarimas, tarimaCount)
+          maxInterlocks = Math.max(maxInterlocks, interlockCount)
+          maxOtros = Math.max(maxOtros, otroCount)
+        }
+      })
+    }
+
     const data = receptions.map(reception => {
       const row: any = {
-        "Código": reception.code || "",
-        "Folio Seguimiento": reception.trackingFolio || "",
-        "Fecha": reception.date ? new Date(reception.date).toLocaleDateString() : "",
-        "Productor": reception.producer?.name || "",
-        "Código Productor": reception.producer?.code || "",
-        "Almacén": reception.warehouse?.name || "",
-        "Producto": reception.product?.name || "",
-        "SKU Producto": reception.product?.sku || "",
+        "Productor": reception.producer?.code || "",
+        "Almacén": reception.warehouse?.code || "",
+        "Producto": reception.product?.sku || "",
+        "Fecha": reception.date || "",
         "Cajas": reception.boxes || 0,
         "Peso por Caja": reception.weightPerBox || 0,
         "Peso Total": reception.totalWeight || 0,
-        "Estado Embarque": reception.shipmentStatus || "pendiente",
-        "Estado Pago": reception.paymentStatus || "pendiente",
       }
 
-      // Agregar materiales devueltos si existen
-      if (query.includeReturnedItems && reception.returnedItems && reception.returnedItems.length > 0) {
-        const returnedItemsDetails = reception.returnedItems.map((item: any) => 
-          `${item.product?.sku || ''} (${item.quantity})`
-        ).join(", ")
-        
-        row["Material Devuelto"] = returnedItemsDetails
-        row["Valor Material Devuelto"] = reception.returnedItems.reduce(
-          (sum: number, item: any) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0
-        )
+      // Agregar materiales devueltos si se solicita
+      if (query.includeReturnedItems) {
+        // Separar items por categoría
+        const cajas: any[] = []
+        const clams: any[] = []
+        const tarimas: any[] = []
+        const interlocks: any[] = []
+        const otros: any[] = []
+
+        if (reception.returnedItems && reception.returnedItems.length > 0) {
+          reception.returnedItems.forEach((item: any) => {
+            const productSku = (item.product?.sku || "").toLowerCase()
+            const productName = (item.product?.name || "").toLowerCase()
+
+            if (productSku.includes("caja") || productName.includes("caja")) {
+              cajas.push(item)
+            } else if (productSku.includes("clam") || productName.includes("clam")) {
+              clams.push(item)
+            } else if (productSku.includes("tarima") || productName.includes("tarima")) {
+              tarimas.push(item)
+            } else if (productSku.includes("interlock") || productName.includes("interlock")) {
+              interlocks.push(item)
+            } else {
+              otros.push(item)
+            }
+          })
+        }
+
+        // Crear todas las columnas necesarias basadas en los máximos
+        for (let i = 1; i <= maxCajas; i++) {
+          row[`Código de Caja ${i}`] = cajas[i - 1]?.product?.sku || ""
+          row[`Cantidad de Caja ${i}`] = cajas[i - 1]?.quantity || ""
+          row[`Precio Unitario Caja ${i}`] = cajas[i - 1]?.unitPrice || ""
+          row[`Precio Total Caja ${i}`] = cajas[i - 1]?.total || ""
+        }
+
+        for (let i = 1; i <= maxClams; i++) {
+          row[`Código de Clam ${i}`] = clams[i - 1]?.product?.sku || ""
+          row[`Cantidad de Clam ${i}`] = clams[i - 1]?.quantity || ""
+          row[`Precio Unitario Clam ${i}`] = clams[i - 1]?.unitPrice || ""
+          row[`Precio Total Clam ${i}`] = clams[i - 1]?.total || ""
+        }
+
+        for (let i = 1; i <= maxTarimas; i++) {
+          row[`Código de Tarima ${i}`] = tarimas[i - 1]?.product?.sku || ""
+          row[`Cantidad de Tarima ${i}`] = tarimas[i - 1]?.quantity || ""
+          row[`Precio Unitario Tarima ${i}`] = tarimas[i - 1]?.unitPrice || ""
+          row[`Precio Total Tarima ${i}`] = tarimas[i - 1]?.total || ""
+        }
+
+        for (let i = 1; i <= maxInterlocks; i++) {
+          row[`Código de Interlock ${i}`] = interlocks[i - 1]?.product?.sku || ""
+          row[`Cantidad de Interlock ${i}`] = interlocks[i - 1]?.quantity || ""
+          row[`Precio Unitario Interlock ${i}`] = interlocks[i - 1]?.unitPrice || ""
+          row[`Precio Total Interlock ${i}`] = interlocks[i - 1]?.total || ""
+        }
+
+        for (let i = 1; i <= maxOtros; i++) {
+          row[`Código de Producto ${i}`] = otros[i - 1]?.product?.sku || ""
+          row[`Cantidad de Producto ${i}`] = otros[i - 1]?.quantity || ""
+          row[`Precio Unitario Producto ${i}`] = otros[i - 1]?.unitPrice || ""
+          row[`Precio Total Producto ${i}`] = otros[i - 1]?.total || ""
+        }
+
+        // Calcular el valor total de todos los materiales devueltos
+        const valorTotal = [
+          ...cajas,
+          ...clams,
+          ...tarimas,
+          ...interlocks,
+          ...otros
+        ].reduce((sum, item) => sum + (Number(item.total) || 0), 0)
+
+        row["Valor Total Material Devuelto"] = valorTotal
       }
 
+      // Agregar notas al final
       if (reception.notes) {
         row["Notas"] = reception.notes
+      } else {
+        row["Notas"] = ""
       }
 
       return row
@@ -757,14 +856,23 @@ export class ImportsService {
           Cajas: 100,
           "Peso por Caja": 18.5,
           "Peso Total": 1850,
-          "Código de Caja": "CAJA-001",
-          "Cantidad de Caja": 10,
-          "Código de Clam": "CLAM-001",
-          "Cantidad de Clam": 5,
-          "Código de Tarima": "TARIMA-001",
-          "Cantidad de Tarima": 2,
-          "Código de Interlock": "INTERLOCK-001",
-          "Cantidad de Interlock": 8,
+          "Código de Caja 1": "CAJA-001",
+          "Cantidad de Caja 1": 10,
+          "Precio Unitario Caja 1": 50,
+          "Precio Total Caja 1": 500,
+          "Código de Clam 1": "CLAM-001",
+          "Cantidad de Clam 1": 5,
+          "Precio Unitario Clam 1": 30,
+          "Precio Total Clam 1": 150,
+          "Código de Tarima 1": "TARIMA-001",
+          "Cantidad de Tarima 1": 2,
+          "Precio Unitario Tarima 1": 100,
+          "Precio Total Tarima 1": 200,
+          "Código de Interlock 1": "INTERLOCK-001",
+          "Cantidad de Interlock 1": 8,
+          "Precio Unitario Interlock 1": 25,
+          "Precio Total Interlock 1": 200,
+          "Valor Total Material Devuelto": 1050,
           Notas: "Recepción de ejemplo",
         }]
         sheetName = "Recepción Fruta"
