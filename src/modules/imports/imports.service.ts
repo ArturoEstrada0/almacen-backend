@@ -11,7 +11,8 @@ import { Movement } from "../inventory/entities/movement.entity"
 import { Supplier } from "../suppliers/entities/supplier.entity"
 import { Producer } from "../producers/entities/producer.entity"
 import { Warehouse } from "../warehouses/entities/warehouse.entity"
-import type { ExportProductsDto, ExportInventoryDto, ExportMovementsDto, ExportSuppliersDto } from "./dto/export-query.dto"
+import { FruitReception } from "../producers/entities/fruit-reception.entity"
+import type { ExportProductsDto, ExportInventoryDto, ExportMovementsDto, ExportSuppliersDto, ExportFruitReceptionsDto } from "./dto/export-query.dto"
 
 @Injectable()
 export class ImportsService {
@@ -31,6 +32,8 @@ export class ImportsService {
     private readonly producersRepository: Repository<Producer>,
     @InjectRepository(Warehouse)
     private readonly warehousesRepository: Repository<Warehouse>,
+    @InjectRepository(FruitReception)
+    private readonly fruitReceptionsRepository: Repository<FruitReception>,
   ) {}
 
   async importFile(buffer: Buffer, mapping: Record<string, string>, type: string, sheetName?: string) {
@@ -320,6 +323,37 @@ export class ImportsService {
             notes = String(row[headers.indexOf(mapping['notes'])] ?? '').trim()
           }
 
+          // Procesar materiales devueltos (caja, clam, tarima, interlock)
+          const returnedItems: any[] = []
+          const materialTypes = [
+            { skuKey: 'codigoCaja', qtyKey: 'cantidadCaja' },
+            { skuKey: 'codigoClam', qtyKey: 'cantidadClam' },
+            { skuKey: 'codigoTarima', qtyKey: 'cantidadTarima' },
+            { skuKey: 'codigoInterlock', qtyKey: 'cantidadInterlock' },
+          ]
+          
+          for (const materialType of materialTypes) {
+            const skuCol = mapping[materialType.skuKey]
+            const qtyCol = mapping[materialType.qtyKey]
+            
+            if (skuCol && qtyCol) {
+              const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
+              const quantity = Number(row[headers.indexOf(qtyCol)] ?? 0)
+              
+              if (sku && quantity > 0) {
+                // Buscar el producto devuelto
+                const returnedProduct = await this.productsRepository.findOne({ where: { sku } })
+                if (returnedProduct) {
+                  returnedItems.push({
+                    productId: returnedProduct.id,
+                    quantity,
+                    unitPrice: returnedProduct.cost || 0, // Usar el costo del producto
+                  })
+                }
+              }
+            }
+          }
+
           // Crear recepción de fruta
           await this.producersService.createFruitReception({
             producerId: producer.id,
@@ -330,6 +364,7 @@ export class ImportsService {
             weightPerBox,
             totalWeight,
             notes,
+            returnedItems: returnedItems.length > 0 ? returnedItems : undefined,
           })
           result.success++
         } else if (type === 'initial-stock') {
@@ -554,6 +589,84 @@ export class ImportsService {
       : XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
   }
 
+  async exportFruitReceptions(query: ExportFruitReceptionsDto): Promise<Buffer> {
+    const qb = this.fruitReceptionsRepository.createQueryBuilder("reception")
+      .leftJoinAndSelect("reception.producer", "producer")
+      .leftJoinAndSelect("reception.warehouse", "warehouse")
+      .leftJoinAndSelect("reception.product", "product")
+      .leftJoinAndSelect("reception.returnedItems", "returnedItems")
+      .leftJoinAndSelect("returnedItems.product", "returnedProduct")
+
+    if (query.startDate && query.endDate) {
+      qb.andWhere("reception.date BETWEEN :startDate AND :endDate", {
+        startDate: query.startDate,
+        endDate: query.endDate,
+      })
+    }
+
+    if (query.producerId && query.producerId !== "all") {
+      qb.andWhere("reception.producerId = :producerId", { producerId: query.producerId })
+    }
+
+    if (query.warehouseId && query.warehouseId !== "all") {
+      qb.andWhere("reception.warehouseId = :warehouseId", { warehouseId: query.warehouseId })
+    }
+
+    if (query.shipmentStatus && query.shipmentStatus !== "all") {
+      qb.andWhere("reception.shipmentStatus = :shipmentStatus", { shipmentStatus: query.shipmentStatus })
+    }
+
+    if (query.paymentStatus && query.paymentStatus !== "all") {
+      qb.andWhere("reception.paymentStatus = :paymentStatus", { paymentStatus: query.paymentStatus })
+    }
+
+    const receptions = await qb.orderBy("reception.date", "DESC").getMany()
+
+    const data = receptions.map(reception => {
+      const row: any = {
+        "Código": reception.code || "",
+        "Folio Seguimiento": reception.trackingFolio || "",
+        "Fecha": reception.date ? new Date(reception.date).toLocaleDateString() : "",
+        "Productor": reception.producer?.name || "",
+        "Código Productor": reception.producer?.code || "",
+        "Almacén": reception.warehouse?.name || "",
+        "Producto": reception.product?.name || "",
+        "SKU Producto": reception.product?.sku || "",
+        "Cajas": reception.boxes || 0,
+        "Peso por Caja": reception.weightPerBox || 0,
+        "Peso Total": reception.totalWeight || 0,
+        "Estado Embarque": reception.shipmentStatus || "pendiente",
+        "Estado Pago": reception.paymentStatus || "pendiente",
+      }
+
+      // Agregar materiales devueltos si existen
+      if (query.includeReturnedItems && reception.returnedItems && reception.returnedItems.length > 0) {
+        const returnedItemsDetails = reception.returnedItems.map((item: any) => 
+          `${item.product?.sku || ''} (${item.quantity})`
+        ).join(", ")
+        
+        row["Material Devuelto"] = returnedItemsDetails
+        row["Valor Material Devuelto"] = reception.returnedItems.reduce(
+          (sum: number, item: any) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0
+        )
+      }
+
+      if (reception.notes) {
+        row["Notas"] = reception.notes
+      }
+
+      return row
+    })
+
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Recepciones Fruta")
+
+    return query.format === "csv"
+      ? Buffer.from(XLSX.utils.sheet_to_csv(ws))
+      : XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
+  }
+
   async generateTemplate(type: string): Promise<Buffer> {
     let data: any[] = []
     let sheetName = "Template"
@@ -644,6 +757,14 @@ export class ImportsService {
           Cajas: 100,
           "Peso por Caja": 18.5,
           "Peso Total": 1850,
+          "Código de Caja": "CAJA-001",
+          "Cantidad de Caja": 10,
+          "Código de Clam": "CLAM-001",
+          "Cantidad de Clam": 5,
+          "Código de Tarima": "TARIMA-001",
+          "Cantidad de Tarima": 2,
+          "Código de Interlock": "INTERLOCK-001",
+          "Cantidad de Interlock": 8,
           Notas: "Recepción de ejemplo",
         }]
         sheetName = "Recepción Fruta"

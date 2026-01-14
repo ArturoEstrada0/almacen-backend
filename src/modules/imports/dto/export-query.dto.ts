@@ -78,3 +78,45 @@ export class ExportSuppliersDto {
   @IsBoolean()
   includeProducts?: boolean
 }
+
+export class ExportFruitReceptionsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  format?: "xlsx" | "csv"
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  startDate?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  endDate?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  producerId?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  warehouseId?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  shipmentStatus?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  includeReturnedItems?: boolean
+}

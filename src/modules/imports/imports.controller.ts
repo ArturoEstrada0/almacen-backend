@@ -5,7 +5,7 @@ import type { Response } from "express"
 import * as multer from "multer"
 import { ImportsService } from "./imports.service"
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
-import { ExportProductsDto, ExportInventoryDto, ExportMovementsDto, ExportSuppliersDto } from "./dto/export-query.dto"
+import { ExportProductsDto, ExportInventoryDto, ExportMovementsDto, ExportSuppliersDto, ExportFruitReceptionsDto } from "./dto/export-query.dto"
 
 @ApiTags("imports")
 @ApiBearerAuth()
@@ -69,6 +69,18 @@ export class ImportsController {
     const buffer = await this.importsService.exportSuppliers(query)
     const format = query.format || "xlsx"
     const filename = `proveedores_${new Date().toISOString().split("T")[0]}.${format}`
+    
+    res.setHeader("Content-Type", format === "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
+    res.send(buffer)
+  }
+
+  @Get("export/fruit-receptions")
+  @ApiOperation({ summary: "Exportar recepciones de fruta a Excel/CSV" })
+  async exportFruitReceptions(@Query() query: ExportFruitReceptionsDto, @Res() res: Response) {
+    const buffer = await this.importsService.exportFruitReceptions(query)
+    const format = query.format || "xlsx"
+    const filename = `recepciones_fruta_${new Date().toISOString().split("T")[0]}.${format}`
     
     res.setHeader("Content-Type", format === "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
