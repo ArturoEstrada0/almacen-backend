@@ -323,33 +323,56 @@ export class ImportsService {
             notes = String(row[headers.indexOf(mapping['notes'])] ?? '').trim()
           }
 
-          // Procesar materiales devueltos (caja, clam, tarima, interlock)
+          // Procesar materiales devueltos (caja, clam, tarima, interlock, producto)
           const returnedItems: any[] = []
-          const materialTypes = [
-            { skuKey: 'codigoCaja', qtyKey: 'cantidadCaja' },
-            { skuKey: 'codigoClam', qtyKey: 'cantidadClam' },
-            { skuKey: 'codigoTarima', qtyKey: 'cantidadTarima' },
-            { skuKey: 'codigoInterlock', qtyKey: 'cantidadInterlock' },
+          
+          // Buscar dinámicamente todas las columnas numeradas para cada tipo
+          const materialCategories = [
+            { prefix: 'codigoCaja', qtyPrefix: 'cantidadCaja', pricePrefix: 'precioUnitarioCaja', totalPrefix: 'precioTotalCaja' },
+            { prefix: 'codigoClam', qtyPrefix: 'cantidadClam', pricePrefix: 'precioUnitarioClam', totalPrefix: 'precioTotalClam' },
+            { prefix: 'codigoTarima', qtyPrefix: 'cantidadTarima', pricePrefix: 'precioUnitarioTarima', totalPrefix: 'precioTotalTarima' },
+            { prefix: 'codigoInterlock', qtyPrefix: 'cantidadInterlock', pricePrefix: 'precioUnitarioInterlock', totalPrefix: 'precioTotalInterlock' },
+            { prefix: 'codigoProducto', qtyPrefix: 'cantidadProducto', pricePrefix: 'precioUnitarioProducto', totalPrefix: 'precioTotalProducto' },
           ]
           
-          for (const materialType of materialTypes) {
-            const skuCol = mapping[materialType.skuKey]
-            const qtyCol = mapping[materialType.qtyKey]
+          for (const category of materialCategories) {
+            // Buscar columnas numeradas (1, 2, 3, etc.)
+            let index = 1
+            let foundColumn = true
             
-            if (skuCol && qtyCol) {
-              const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
-              const quantity = Number(row[headers.indexOf(qtyCol)] ?? 0)
+            while (foundColumn) {
+              const skuKey = index === 1 ? category.prefix : `${category.prefix}${index}`
+              const qtyKey = index === 1 ? category.qtyPrefix : `${category.qtyPrefix}${index}`
+              const priceKey = index === 1 ? category.pricePrefix : `${category.pricePrefix}${index}`
               
-              if (sku && quantity > 0) {
-                // Buscar el producto devuelto
-                const returnedProduct = await this.productsRepository.findOne({ where: { sku } })
-                if (returnedProduct) {
-                  returnedItems.push({
-                    productId: returnedProduct.id,
-                    quantity,
-                    unitPrice: returnedProduct.cost || 0, // Usar el costo del producto
-                  })
+              const skuCol = mapping[skuKey]
+              const qtyCol = mapping[qtyKey]
+              const priceCol = mapping[priceKey]
+              
+              if (skuCol && qtyCol) {
+                const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
+                const quantity = Number(row[headers.indexOf(qtyCol)] ?? 0)
+                let unitPrice = priceCol ? Number(row[headers.indexOf(priceCol)] ?? 0) : 0
+                
+                if (sku && quantity > 0) {
+                  // Buscar el producto devuelto
+                  const returnedProduct = await this.productsRepository.findOne({ where: { sku } })
+                  if (returnedProduct) {
+                    // Si no hay precio en la columna, usar el costo del producto
+                    if (!unitPrice) {
+                      unitPrice = returnedProduct.cost || 0
+                    }
+                    
+                    returnedItems.push({
+                      productId: returnedProduct.id,
+                      quantity,
+                      unitPrice,
+                    })
+                  }
                 }
+                index++
+              } else {
+                foundColumn = false
               }
             }
           }
