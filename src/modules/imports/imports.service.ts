@@ -328,11 +328,11 @@ export class ImportsService {
           
           // Buscar dinámicamente todas las columnas numeradas para cada tipo
           const materialCategories = [
-            { prefix: 'codigoCaja', qtyPrefix: 'cantidadCaja', pricePrefix: 'precioUnitarioCaja', totalPrefix: 'precioTotalCaja' },
-            { prefix: 'codigoClam', qtyPrefix: 'cantidadClam', pricePrefix: 'precioUnitarioClam', totalPrefix: 'precioTotalClam' },
-            { prefix: 'codigoTarima', qtyPrefix: 'cantidadTarima', pricePrefix: 'precioUnitarioTarima', totalPrefix: 'precioTotalTarima' },
-            { prefix: 'codigoInterlock', qtyPrefix: 'cantidadInterlock', pricePrefix: 'precioUnitarioInterlock', totalPrefix: 'precioTotalInterlock' },
-            { prefix: 'codigoProducto', qtyPrefix: 'cantidadProducto', pricePrefix: 'precioUnitarioProducto', totalPrefix: 'precioTotalProducto' },
+            { prefix: 'codigoCaja', qtyPrefix: 'cantidadCaja' },
+            { prefix: 'codigoClam', qtyPrefix: 'cantidadClam' },
+            { prefix: 'codigoTarima', qtyPrefix: 'cantidadTarima' },
+            { prefix: 'codigoInterlock', qtyPrefix: 'cantidadInterlock' },
+            { prefix: 'codigoProducto', qtyPrefix: 'cantidadProducto' },
           ]
           
           for (const category of materialCategories) {
@@ -343,25 +343,20 @@ export class ImportsService {
             while (foundColumn) {
               const skuKey = index === 1 ? category.prefix : `${category.prefix}${index}`
               const qtyKey = index === 1 ? category.qtyPrefix : `${category.qtyPrefix}${index}`
-              const priceKey = index === 1 ? category.pricePrefix : `${category.pricePrefix}${index}`
               
               const skuCol = mapping[skuKey]
               const qtyCol = mapping[qtyKey]
-              const priceCol = mapping[priceKey]
               
               if (skuCol && qtyCol) {
                 const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
                 const quantity = Number(row[headers.indexOf(qtyCol)] ?? 0)
-                let unitPrice = priceCol ? Number(row[headers.indexOf(priceCol)] ?? 0) : 0
                 
                 if (sku && quantity > 0) {
                   // Buscar el producto devuelto
                   const returnedProduct = await this.productsRepository.findOne({ where: { sku } })
                   if (returnedProduct) {
-                    // Si no hay precio en la columna, usar el costo del producto
-                    if (!unitPrice) {
-                      unitPrice = returnedProduct.cost || 0
-                    }
+                    // Usar automáticamente el precio de venta del producto como precio unitario
+                    const unitPrice = returnedProduct.price || 0
                     
                     returnedItems.push({
                       productId: returnedProduct.id,
@@ -726,48 +721,27 @@ export class ImportsService {
         for (let i = 1; i <= maxCajas; i++) {
           row[`Código de Caja ${i}`] = cajas[i - 1]?.product?.sku || ""
           row[`Cantidad de Caja ${i}`] = cajas[i - 1]?.quantity || ""
-          row[`Precio Unitario Caja ${i}`] = cajas[i - 1]?.unitPrice || ""
-          row[`Precio Total Caja ${i}`] = cajas[i - 1]?.total || ""
         }
 
         for (let i = 1; i <= maxClams; i++) {
           row[`Código de Clam ${i}`] = clams[i - 1]?.product?.sku || ""
           row[`Cantidad de Clam ${i}`] = clams[i - 1]?.quantity || ""
-          row[`Precio Unitario Clam ${i}`] = clams[i - 1]?.unitPrice || ""
-          row[`Precio Total Clam ${i}`] = clams[i - 1]?.total || ""
         }
 
         for (let i = 1; i <= maxTarimas; i++) {
           row[`Código de Tarima ${i}`] = tarimas[i - 1]?.product?.sku || ""
           row[`Cantidad de Tarima ${i}`] = tarimas[i - 1]?.quantity || ""
-          row[`Precio Unitario Tarima ${i}`] = tarimas[i - 1]?.unitPrice || ""
-          row[`Precio Total Tarima ${i}`] = tarimas[i - 1]?.total || ""
         }
 
         for (let i = 1; i <= maxInterlocks; i++) {
           row[`Código de Interlock ${i}`] = interlocks[i - 1]?.product?.sku || ""
           row[`Cantidad de Interlock ${i}`] = interlocks[i - 1]?.quantity || ""
-          row[`Precio Unitario Interlock ${i}`] = interlocks[i - 1]?.unitPrice || ""
-          row[`Precio Total Interlock ${i}`] = interlocks[i - 1]?.total || ""
         }
 
         for (let i = 1; i <= maxOtros; i++) {
           row[`Código de Producto ${i}`] = otros[i - 1]?.product?.sku || ""
           row[`Cantidad de Producto ${i}`] = otros[i - 1]?.quantity || ""
-          row[`Precio Unitario Producto ${i}`] = otros[i - 1]?.unitPrice || ""
-          row[`Precio Total Producto ${i}`] = otros[i - 1]?.total || ""
         }
-
-        // Calcular el valor total de todos los materiales devueltos
-        const valorTotal = [
-          ...cajas,
-          ...clams,
-          ...tarimas,
-          ...interlocks,
-          ...otros
-        ].reduce((sum, item) => sum + (Number(item.total) || 0), 0)
-
-        row["Valor Total Material Devuelto"] = valorTotal
       }
 
       // Agregar notas al final
@@ -881,21 +855,12 @@ export class ImportsService {
           "Peso Total": 1850,
           "Código de Caja 1": "CAJA-001",
           "Cantidad de Caja 1": 10,
-          "Precio Unitario Caja 1": 50,
-          "Precio Total Caja 1": 500,
           "Código de Clam 1": "CLAM-001",
           "Cantidad de Clam 1": 5,
-          "Precio Unitario Clam 1": 30,
-          "Precio Total Clam 1": 150,
           "Código de Tarima 1": "TARIMA-001",
           "Cantidad de Tarima 1": 2,
-          "Precio Unitario Tarima 1": 100,
-          "Precio Total Tarima 1": 200,
           "Código de Interlock 1": "INTERLOCK-001",
           "Cantidad de Interlock 1": 8,
-          "Precio Unitario Interlock 1": 25,
-          "Precio Total Interlock 1": 200,
-          "Valor Total Material Devuelto": 1050,
           Notas: "Recepción de ejemplo",
         }]
         sheetName = "Recepción Fruta"
