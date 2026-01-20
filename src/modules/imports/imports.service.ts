@@ -129,6 +129,19 @@ export class ImportsService {
             const expDate = row[headers.indexOf(mapping['expirationDate'])]
             if (expDate) inventoryItem.expirationDate = new Date(expDate)
           }
+          if (mapping['costPrice']) {
+            const cost = Number(row[headers.indexOf(mapping['costPrice'])] ?? 0)
+            if (cost) product.cost = cost
+          }
+          if (mapping['price']) {
+            const price = Number(row[headers.indexOf(mapping['price'])] ?? 0)
+            if (price) product.price = price
+          }
+
+          // Guardar cambios en el producto si se actualizaron precios
+          if (mapping['costPrice'] || mapping['price']) {
+            await this.productsRepository.save(product)
+          }
 
           await this.inventoryRepository.save(inventoryItem)
           result.success++
@@ -189,17 +202,15 @@ export class ImportsService {
           const dateCol = mapping['date']
           const skuCol = mapping['sku']
           const quantityCol = mapping['quantity']
-          const priceCol = mapping['unitPrice']
 
-          if (!producerCol || !warehouseCol || !skuCol || !quantityCol || !priceCol) {
-            throw new Error('Productor, Almacén, SKU, Cantidad o Precio mapping missing')
+          if (!producerCol || !warehouseCol || !skuCol || !quantityCol) {
+            throw new Error('Productor, Almacén, SKU o Cantidad mapping missing')
           }
 
           const producerCode = String(row[headers.indexOf(producerCol)] ?? '').trim()
           const warehouseCode = String(row[headers.indexOf(warehouseCol)] ?? '').trim()
           const sku = String(row[headers.indexOf(skuCol)] ?? '').trim()
           const quantity = Number(row[headers.indexOf(quantityCol)] ?? 0)
-          const unitPrice = Number(row[headers.indexOf(priceCol)] ?? 0)
 
           if (!producerCode || !warehouseCode || !sku) {
             throw new Error('Productor, Almacén o SKU vacío')
@@ -221,6 +232,9 @@ export class ImportsService {
           // Buscar producto
           const product = await this.productsRepository.findOne({ where: { sku } })
           if (!product) throw new Error(`Producto con SKU ${sku} no encontrado`)
+          
+          // Usar el precio de venta del producto
+          const unitPrice = product.price || 0
 
           // Obtener fecha
           let assignmentDate = new Date().toISOString().split('T')[0]
@@ -518,6 +532,8 @@ export class ImportsService {
         "Stock Mínimo": item.minStock || 0,
         "Stock Máximo": item.maxStock || 0,
         "Punto de Reorden": item.reorderPoint || 0,
+        "Precio de Costo": item.product.cost || 0,
+        "Precio de Venta": item.product.price || 0,
       }
 
       if (query.includeLots) {
@@ -564,10 +580,10 @@ export class ImportsService {
           Tipo: mov.type,
           Almacén: mov.warehouse?.name || "",
           SKU: item.product?.sku || "",
-          Producto: item.product?.name || "",
           Cantidad: item.quantity,
-          Código: mov.code || "",
-          Notas: mov.notes || "",
+          "Número de Lote": "", // No hay campo de lote en MovementItem, se puede agregar si es necesario
+          "Costo Unitario": item.cost || 0,
+          Notas: item.notes || mov.notes || "",
         })
       })
     })
@@ -789,6 +805,8 @@ export class ImportsService {
           Ubicación: "A-1-1",
           Lote: "LOTE-001",
           Vencimiento: "31/12/2025",
+          "Precio de Costo": 0.00,
+          "Precio de Venta": 0.00,
         }]
         sheetName = "Inventario"
         break
@@ -823,10 +841,10 @@ export class ImportsService {
           Tipo: "entrada",
           Almacén: "ALM-01",
           SKU: "PROD-001",
-          Producto: "Producto Ejemplo",
           Cantidad: 50,
-          Código: "MOV-001",
-          Notas: "Nota de ejemplo",
+          "Número de Lote": "LOT-2024-001",
+          "Costo Unitario": 0.00,
+          Notas: "Información adicional sobre el movimiento",
         }]
         sheetName = "Movimientos"
         break
@@ -838,7 +856,6 @@ export class ImportsService {
           Fecha: "01/01/2025",
           SKU: "INS-001",
           Cantidad: 50,
-          "Precio Unitario": 10.50,
           Notas: "Asignación de ejemplo",
         }]
         sheetName = "Asignación Insumos"
