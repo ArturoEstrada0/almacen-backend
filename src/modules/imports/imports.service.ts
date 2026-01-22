@@ -133,13 +133,9 @@ export class ImportsService {
             const cost = Number(row[headers.indexOf(mapping['costPrice'])] ?? 0)
             if (cost) product.cost = cost
           }
-          if (mapping['price']) {
-            const price = Number(row[headers.indexOf(mapping['price'])] ?? 0)
-            if (price) product.price = price
-          }
 
-          // Guardar cambios en el producto si se actualizaron precios
-          if (mapping['costPrice'] || mapping['price']) {
+          // Guardar cambios en el producto si se actualizó el precio de costo
+          if (mapping['costPrice']) {
             await this.productsRepository.save(product)
           }
 
@@ -233,8 +229,8 @@ export class ImportsService {
           const product = await this.productsRepository.findOne({ where: { sku } })
           if (!product) throw new Error(`Producto con SKU ${sku} no encontrado`)
           
-          // Usar el precio de venta del producto
-          const unitPrice = product.price || 0
+          // Usar el precio de costo del producto
+          const unitPrice = product.cost || 0
 
           // Obtener fecha
           let assignmentDate = new Date().toISOString().split('T')[0]
@@ -369,8 +365,8 @@ export class ImportsService {
                   // Buscar el producto devuelto
                   const returnedProduct = await this.productsRepository.findOne({ where: { sku } })
                   if (returnedProduct) {
-                    // Usar automáticamente el precio de venta del producto como precio unitario
-                    const unitPrice = returnedProduct.price || 0
+                    // Usar automáticamente el precio de costo del producto como precio unitario
+                    const unitPrice = returnedProduct.cost || 0
                     
                     returnedItems.push({
                       productId: returnedProduct.id,
@@ -418,7 +414,17 @@ export class ImportsService {
           const product = await this.productsRepository.findOne({ where: { sku } })
           if (!product) throw new Error(`Producto con SKU ${sku} no encontrado`)
 
-          const warehouse = await this.warehousesService.findByCode(warehouseCode)
+          // Buscar almacén por código o por ID si está disponible
+          let warehouse
+          if (mapping['warehouseId']) {
+            const warehouseId = String(row[headers.indexOf(mapping['warehouseId'])] ?? '').trim()
+            if (warehouseId) {
+              warehouse = await this.warehousesRepository.findOne({ where: { id: warehouseId } })
+            }
+          }
+          if (!warehouse) {
+            warehouse = await this.warehousesService.findByCode(warehouseCode)
+          }
           if (!warehouse) throw new Error(`Almacén ${warehouseCode} no encontrado`)
 
           let inventoryItem = await this.inventoryRepository.findOne({
@@ -449,11 +455,19 @@ export class ImportsService {
           }
           if (mapping['expirationDate']) {
             const expDate = row[headers.indexOf(mapping['expirationDate'])]
-            if (expDate) {
-              if (typeof expDate === 'number') {
-                inventoryItem.expirationDate = new Date((expDate - 25569) * 86400 * 1000)
-              } else {
-                inventoryItem.expirationDate = new Date(expDate)
+            if (expDate && expDate !== '' && expDate !== null && expDate !== undefined) {
+              if (typeof expDate === 'number' && !isNaN(expDate)) {
+                const date = new Date((expDate - 25569) * 86400 * 1000)
+                if (!isNaN(date.getTime())) {
+                  inventoryItem.expirationDate = date
+                }
+              } else if (typeof expDate === 'string') {
+                const date = new Date(expDate)
+                if (!isNaN(date.getTime())) {
+                  inventoryItem.expirationDate = date
+                }
+              } else if (expDate instanceof Date && !isNaN(expDate.getTime())) {
+                inventoryItem.expirationDate = expDate
               }
             }
           }
@@ -465,6 +479,13 @@ export class ImportsService {
           }
           if (mapping['reorderPoint']) {
             inventoryItem.reorderPoint = Number(row[headers.indexOf(mapping['reorderPoint'])] ?? 0)
+          }
+          if (mapping['costPrice']) {
+            const cost = Number(row[headers.indexOf(mapping['costPrice'])] ?? 0)
+            if (cost) {
+              product.cost = cost
+              await this.productsRepository.save(product)
+            }
           }
 
           await this.inventoryRepository.save(inventoryItem)
@@ -533,7 +554,6 @@ export class ImportsService {
         "Stock Máximo": item.maxStock || 0,
         "Punto de Reorden": item.reorderPoint || 0,
         "Precio de Costo": item.product.cost || 0,
-        "Precio de Venta": item.product.price || 0,
       }
 
       if (query.includeLots) {
@@ -806,7 +826,6 @@ export class ImportsService {
           Lote: "LOTE-001",
           Vencimiento: "31/12/2025",
           "Precio de Costo": 0.00,
-          "Precio de Venta": 0.00,
         }]
         sheetName = "Inventario"
         break
@@ -887,10 +906,12 @@ export class ImportsService {
         data = [{
           SKU: "PROD-001",
           Almacén: "ALM-01",
+          "ID Almacén": "00000000-0000-0000-0000-000000000000",
           Cantidad: 100,
           Ubicación: "A-1-1",
           Lote: "LOTE-001",
           Vencimiento: "31/12/2025",
+          "Precio de Costo": 0.00,
           "Stock Mínimo": 10,
           "Stock Máximo": 500,
           "Punto de Reorden": 50,
