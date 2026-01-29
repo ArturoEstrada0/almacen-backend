@@ -36,7 +36,7 @@ export class ImportsService {
     private readonly fruitReceptionsRepository: Repository<FruitReception>,
   ) {}
 
-  async importFile(buffer: Buffer, mapping: Record<string, string>, type: string, sheetName?: string) {
+  async importFile(buffer: Buffer, mapping: Record<string, string>, type: string, sheetName?: string, options?: { skipStockValidation?: boolean; producerMapping?: Record<string, string> }) {
     if (!buffer) throw new BadRequestException('No file provided')
     if (!type) throw new BadRequestException('No import type provided')
 
@@ -52,7 +52,14 @@ export class ImportsService {
     const headers: string[] = rows[0].map((h: any) => (h ?? '').toString().trim())
     const dataRows = rows.slice(1)
 
-    const result = { processed: dataRows.length, success: 0, errors: [] as any[] }
+    const result = { 
+      processed: dataRows.length, 
+      success: 0, 
+      errors: [] as any[],
+      // Para errores resolubles en input-assignments
+      resolvableErrors: [] as any[],
+      availableProducers: [] as any[]
+    }
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i]
@@ -212,14 +219,38 @@ export class ImportsService {
             throw new Error('Productor, Almacén o SKU vacío')
           }
 
+          // Si hay un mapeo de productores proporcionado, usar ese
+          let resolvedProducerCode = producerCode
+          if (options?.producerMapping && options.producerMapping[producerCode]) {
+            resolvedProducerCode = options.producerMapping[producerCode]
+          }
+
           // Buscar productor por código o nombre
           const producer = await this.producersRepository.findOne({ 
             where: [
-              { code: producerCode },
-              { name: producerCode }
+              { code: resolvedProducerCode },
+              { name: resolvedProducerCode }
             ]
           })
-          if (!producer) throw new Error(`Productor ${producerCode} no encontrado`)
+          
+          if (!producer) {
+            // Agregar a errores resolubles
+            result.resolvableErrors.push({
+              row: rowNumber,
+              type: 'producer_not_found',
+              originalValue: producerCode,
+              message: `Productor "${producerCode}" no encontrado`,
+              rowData: {
+                producerCode,
+                warehouseCode,
+                sku,
+                quantity,
+                date: dateCol ? row[headers.indexOf(dateCol)] : null,
+                notes: mapping['notes'] ? row[headers.indexOf(mapping['notes'])] : ''
+              }
+            })
+            continue
+          }
 
           // Buscar almacén
           const warehouse = await this.warehousesService.findByCode(warehouseCode)
@@ -254,18 +285,45 @@ export class ImportsService {
           }
 
           // Crear asignación de insumos
-          await this.producersService.createInputAssignment({
-            producerId: producer.id,
-            warehouseId: warehouse.id,
-            date: assignmentDate,
-            notes,
-            items: [{
-              productId: product.id,
-              quantity,
-              unitPrice,
-            }],
-          })
-          result.success++
+          try {
+            await this.producersService.createInputAssignment({
+              producerId: producer.id,
+              warehouseId: warehouse.id,
+              date: assignmentDate,
+              notes,
+              items: [{
+                productId: product.id,
+                quantity,
+                unitPrice,
+              }],
+            }, options?.skipStockValidation)
+            result.success++
+          } catch (assignError: any) {
+            // Verificar si es error de stock insuficiente
+            if (assignError.message?.includes('Insufficient stock') || assignError.message?.includes('stock insuficiente')) {
+              result.resolvableErrors.push({
+                row: rowNumber,
+                type: 'insufficient_stock',
+                message: `Stock insuficiente para ${sku} en ${warehouseCode}`,
+                rowData: {
+                  producerId: producer.id,
+                  producerCode,
+                  producerName: producer.name,
+                  warehouseId: warehouse.id,
+                  warehouseCode,
+                  productId: product.id,
+                  sku,
+                  productName: product.name,
+                  quantity,
+                  date: assignmentDate,
+                  notes,
+                  unitPrice
+                }
+              })
+            } else {
+              throw assignError
+            }
+          }
         } else if (type === 'fruit-receptions') {
           // Importación de recepción de fruta
           const producerCol = mapping['producer']
@@ -495,6 +553,94 @@ export class ImportsService {
         }
       } catch (err: any) {
         result.errors.push({ row: rowNumber, error: err.message || String(err) })
+      }
+    }
+
+    // Si hay errores resolubles de productores, incluir la lista de productores disponibles
+    if (type === 'input-assignments' && result.resolvableErrors.some(e => e.type === 'producer_not_found')) {
+      const producers = await this.producersRepository.find({ 
+        select: ['id', 'code', 'name'],
+        order: { code: 'ASC' }
+      })
+      result.availableProducers = producers
+    }
+
+    return result
+  }
+
+  // Método para resolver errores de importación de asignaciones
+  async resolveInputAssignmentErrors(
+    resolutions: Array<{
+      rowData: any;
+      action: 'import_without_movement' | 'skip' | 'use_producer';
+      newProducerId?: string;
+    }>
+  ) {
+    const result = { success: 0, errors: [] as any[] }
+
+    for (const resolution of resolutions) {
+      try {
+        if (resolution.action === 'skip') {
+          continue
+        }
+
+        const { rowData } = resolution
+
+        if (resolution.action === 'use_producer' && resolution.newProducerId) {
+          // Usar el productor seleccionado por el usuario
+          const producer = await this.producersRepository.findOne({ where: { id: resolution.newProducerId } })
+          if (!producer) {
+            result.errors.push({ error: `Productor ${resolution.newProducerId} no encontrado` })
+            continue
+          }
+
+          // Buscar almacén y producto
+          const warehouse = await this.warehousesService.findByCode(rowData.warehouseCode)
+          if (!warehouse) {
+            result.errors.push({ error: `Almacén ${rowData.warehouseCode} no encontrado` })
+            continue
+          }
+
+          const product = await this.productsRepository.findOne({ where: { sku: rowData.sku } })
+          if (!product) {
+            result.errors.push({ error: `Producto ${rowData.sku} no encontrado` })
+            continue
+          }
+
+          // Intentar crear la asignación
+          try {
+            await this.producersService.createInputAssignment({
+              producerId: producer.id,
+              warehouseId: warehouse.id,
+              date: rowData.date || new Date().toISOString().split('T')[0],
+              notes: rowData.notes || '',
+              items: [{
+                productId: product.id,
+                quantity: rowData.quantity,
+                unitPrice: product.cost || 0,
+              }],
+            }, false) // No saltar validación de stock
+            result.success++
+          } catch (err: any) {
+            result.errors.push({ error: err.message })
+          }
+        } else if (resolution.action === 'import_without_movement') {
+          // Importar sin crear movimiento de inventario (para casos de stock insuficiente)
+          await this.producersService.createInputAssignment({
+            producerId: rowData.producerId,
+            warehouseId: rowData.warehouseId,
+            date: rowData.date,
+            notes: rowData.notes || '',
+            items: [{
+              productId: rowData.productId,
+              quantity: rowData.quantity,
+              unitPrice: rowData.unitPrice || 0,
+            }],
+          }, true) // Saltar validación de stock
+          result.success++
+        }
+      } catch (err: any) {
+        result.errors.push({ error: err.message || String(err) })
       }
     }
 

@@ -166,7 +166,7 @@ export class ProducersService {
   }
 
   // Input Assignments
-  async createInputAssignment(dto: CreateInputAssignmentDto): Promise<InputAssignment> {
+  async createInputAssignment(dto: CreateInputAssignmentDto, skipStockValidation: boolean = false): Promise<InputAssignment> {
     const queryRunner = this.dataSource.createQueryRunner()
     await queryRunner.connect()
     await queryRunner.startTransaction()
@@ -198,17 +198,19 @@ export class ProducersService {
         await queryRunner.manager.save(item)
       }
 
-      // Create inventory movement (salida)
-      await this.inventoryService.createMovement({
-        type: MovementType.SALIDA,
-        warehouseId: dto.warehouseId,
-        reference: `Asignación a productor`,
-        notes: dto.notes,
-        items: dto.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        })),
-      })
+      // Create inventory movement (salida) - solo si no se salta la validación de stock
+      if (!skipStockValidation) {
+        await this.inventoryService.createMovement({
+          type: MovementType.SALIDA,
+          warehouseId: dto.warehouseId,
+          reference: `Asignación a productor`,
+          notes: dto.notes,
+          items: dto.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+          })),
+        })
+      }
 
       // Create account movement (debit - producer owes)
       // Build detailed description with product names and quantities

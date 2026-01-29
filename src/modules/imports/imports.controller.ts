@@ -97,4 +97,18 @@ export class ImportsController {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
     res.send(buffer)
   }
+
+  @Post("resolve-errors")
+  @ApiOperation({ summary: "Resolver errores de importación de asignaciones de insumos" })
+  async resolveImportErrors(
+    @Body() body: {
+      resolutions: Array<{
+        rowData: any;
+        action: 'import_without_movement' | 'skip' | 'use_producer';
+        newProducerId?: string;
+      }>
+    }
+  ) {
+    return await this.importsService.resolveInputAssignmentErrors(body.resolutions)
+  }
 }
