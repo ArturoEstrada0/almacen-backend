@@ -13,6 +13,7 @@ import { Producer } from "../producers/entities/producer.entity"
 import { InputAssignment } from "../producers/entities/input-assignment.entity"
 import { InputAssignmentItem } from "../producers/entities/input-assignment-item.entity"
 import { FruitReception } from "../producers/entities/fruit-reception.entity"
+import { Shipment } from "../producers/entities/shipment.entity"
 import { Warehouse } from "../warehouses/entities/warehouse.entity"
 
 @Module({
@@ -26,6 +27,7 @@ import { Warehouse } from "../warehouses/entities/warehouse.entity"
       InputAssignment,
       InputAssignmentItem,
       FruitReception,
+      Shipment,
       Warehouse,
     ]),
     ProductsModule,

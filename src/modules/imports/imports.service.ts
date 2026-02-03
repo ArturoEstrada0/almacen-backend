@@ -12,6 +12,7 @@ import { Supplier } from "../suppliers/entities/supplier.entity"
 import { Producer } from "../producers/entities/producer.entity"
 import { Warehouse } from "../warehouses/entities/warehouse.entity"
 import { FruitReception } from "../producers/entities/fruit-reception.entity"
+import { Shipment } from "../producers/entities/shipment.entity"
 import type { ExportProductsDto, ExportInventoryDto, ExportMovementsDto, ExportSuppliersDto, ExportFruitReceptionsDto } from "./dto/export-query.dto"
 
 @Injectable()
@@ -34,6 +35,8 @@ export class ImportsService {
     private readonly warehousesRepository: Repository<Warehouse>,
     @InjectRepository(FruitReception)
     private readonly fruitReceptionsRepository: Repository<FruitReception>,
+    @InjectRepository(Shipment)
+    private readonly shipmentsRepository: Repository<Shipment>,
   ) {}
 
   async importFile(buffer: Buffer, mapping: Record<string, string>, type: string, sheetName?: string, options?: { skipStockValidation?: boolean; producerMapping?: Record<string, string> }) {
@@ -547,6 +550,75 @@ export class ImportsService {
           }
 
           await this.inventoryRepository.save(inventoryItem)
+          result.success++
+        } else if (type === 'shipments') {
+          // Importación de embarques
+          const codeCol = mapping['code']
+          const dateCol = mapping['date']
+          const carrierCol = mapping['carrier']
+
+          if (!codeCol || !dateCol) {
+            throw new Error('Código o Fecha de Embarque mapping missing')
+          }
+
+          const code = String(row[headers.indexOf(codeCol)] ?? '').trim()
+          if (!code) throw new Error('Código de embarque vacío')
+
+          // Obtener fecha
+          let shipmentDate = new Date().toISOString().split('T')[0]
+          const dateValue = row[headers.indexOf(dateCol)]
+          if (dateValue) {
+            if (typeof dateValue === 'number') {
+              const excelDate = new Date((dateValue - 25569) * 86400 * 1000)
+              shipmentDate = excelDate.toISOString().split('T')[0]
+            } else {
+              shipmentDate = new Date(dateValue).toISOString().split('T')[0]
+            }
+          }
+
+          // Verificar si ya existe un embarque con ese código
+          const existingShipment = await this.shipmentsRepository.findOne({ where: { code } })
+          if (existingShipment) {
+            throw new Error(`Ya existe un embarque con el código ${code}`)
+          }
+
+          // Crear embarque
+          const shipment = this.shipmentsRepository.create({
+            code,
+            date: shipmentDate,
+            status: 'embarcada',
+          })
+
+          // Campos opcionales
+          if (carrierCol) {
+            shipment.carrier = String(row[headers.indexOf(carrierCol)] ?? '').trim() || null
+          }
+          if (mapping['carrierContact']) {
+            shipment.carrierContact = String(row[headers.indexOf(mapping['carrierContact'])] ?? '').trim() || null
+          }
+          if (mapping['trackingFolio']) {
+            shipment.trackingFolio = String(row[headers.indexOf(mapping['trackingFolio'])] ?? '').trim() || null
+          }
+          if (mapping['totalBoxes']) {
+            shipment.totalBoxes = Number(row[headers.indexOf(mapping['totalBoxes'])] ?? 0)
+          }
+          if (mapping['status']) {
+            const status = String(row[headers.indexOf(mapping['status'])] ?? '').trim().toLowerCase()
+            if (['embarcada', 'en-transito', 'recibida', 'vendida'].includes(status)) {
+              shipment.status = status as any
+            }
+          }
+          if (mapping['salePricePerBox']) {
+            shipment.salePricePerBox = Number(row[headers.indexOf(mapping['salePricePerBox'])] ?? 0) || null
+          }
+          if (mapping['totalSale']) {
+            shipment.totalSale = Number(row[headers.indexOf(mapping['totalSale'])] ?? 0) || null
+          }
+          if (mapping['notes']) {
+            shipment.notes = String(row[headers.indexOf(mapping['notes'])] ?? '').trim() || null
+          }
+
+          await this.shipmentsRepository.save(shipment)
           result.success++
         } else {
           throw new Error('Unsupported import type')
@@ -1063,6 +1135,36 @@ export class ImportsService {
           "Punto de Reorden": 50,
         }]
         sheetName = "Carga Inicial"
+        break
+
+      case "shipments":
+        data = [
+          {
+            "Código de Embarque": "EMB-2025-001",
+            "Fecha de Embarque": "03/02/2025",
+            "Folio de Seguimiento": "TRACK-001",
+            "Estado": "embarcada",
+            "Transportista": "Transportes ABC S.A.",
+            "Contacto Transportista": "5551234567",
+            "Total de Cajas": 250,
+            "Precio por Caja": 150.00,
+            "Venta Total": 37500.00,
+            "Notas": "Embarque de ejemplo - primer envío",
+          },
+          {
+            "Código de Embarque": "EMB-2025-002",
+            "Fecha de Embarque": "04/02/2025",
+            "Folio de Seguimiento": "TRACK-002",
+            "Estado": "en-transito",
+            "Transportista": "Logística Express",
+            "Contacto Transportista": "5559876543",
+            "Total de Cajas": 180,
+            "Precio por Caja": 145.00,
+            "Venta Total": 26100.00,
+            "Notas": "Segundo embarque del mes",
+          },
+        ]
+        sheetName = "Embarques"
         break
 
       default:
