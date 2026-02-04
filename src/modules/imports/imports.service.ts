@@ -619,6 +619,48 @@ export class ImportsService {
           }
 
           await this.shipmentsRepository.save(shipment)
+
+          // Procesar recepciones si se incluyen en la importación
+          // Se puede incluir el campo "receptionCodes" con códigos separados por comas o punto y coma
+          if (mapping['receptionCodes']) {
+            const receptionCodesStr = String(row[headers.indexOf(mapping['receptionCodes'])] ?? '').trim()
+            if (receptionCodesStr) {
+              // Separar por coma o punto y coma
+              const codes = receptionCodesStr.split(/[,;]/).map(c => c.trim()).filter(c => c)
+              
+              for (const receptionCode of codes) {
+                // Buscar la recepción por código
+                const reception = await this.fruitReceptionsRepository.findOne({ 
+                  where: { receptionNumber: receptionCode } 
+                })
+                
+                if (reception) {
+                  // Verificar que esté pendiente
+                  if (reception.shipmentStatus !== 'pendiente') {
+                    throw new Error(`Recepción ${receptionCode} no está disponible (estado: ${reception.shipmentStatus})`)
+                  }
+                  
+                  // Asociar recepción al embarque
+                  reception.shipmentId = shipment.id
+                  reception.shipmentStatus = 'embarcada'
+                  await this.fruitReceptionsRepository.save(reception)
+                } else {
+                  throw new Error(`Recepción ${receptionCode} no encontrada`)
+                }
+              }
+
+              // Recalcular totalBoxes si no se proporcionó
+              if (!mapping['totalBoxes']) {
+                const allReceptions = await this.fruitReceptionsRepository.find({ 
+                  where: { shipmentId: shipment.id } 
+                })
+                const totalBoxes = allReceptions.reduce((sum, r) => sum + Number(r.boxes || 0), 0)
+                shipment.totalBoxes = totalBoxes
+                await this.shipmentsRepository.save(shipment)
+              }
+            }
+          }
+
           result.success++
         } else {
           throw new Error('Unsupported import type')
@@ -1142,6 +1184,7 @@ export class ImportsService {
           {
             "Código de Embarque": "EMB-2025-001",
             "Fecha de Embarque": "03/02/2025",
+            "Recepciones": "REC-001,REC-002,REC-003",
             "Folio de Seguimiento": "TRACK-001",
             "Estado": "embarcada",
             "Transportista": "Transportes ABC S.A.",
@@ -1154,6 +1197,7 @@ export class ImportsService {
           {
             "Código de Embarque": "EMB-2025-002",
             "Fecha de Embarque": "04/02/2025",
+            "Recepciones": "REC-004,REC-005",
             "Folio de Seguimiento": "TRACK-002",
             "Estado": "en-transito",
             "Transportista": "Logística Express",
