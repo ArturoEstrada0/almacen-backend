@@ -631,7 +631,7 @@ export class ImportsService {
               for (const receptionCode of codes) {
                 // Buscar la recepción por código
                 const reception = await this.fruitReceptionsRepository.findOne({ 
-                  where: { receptionNumber: receptionCode } 
+                  where: { code: receptionCode } 
                 })
                 
                 if (reception) {
