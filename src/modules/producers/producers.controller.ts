@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger"
 import { ProducersService } from "./producers.service"
 import { CreateProducerDto } from "./dto/create-producer.dto"
 import { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto"
+import { CreateInputReturnDto } from "./dto/create-input-return.dto"
 import { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto"
 import { CreateShipmentDto } from "./dto/create-shipment.dto"
 import { CreatePaymentDto } from "./dto/create-payment.dto"
@@ -40,6 +41,20 @@ export class ProducersController {
   @ApiResponse({ status: 201, description: "Input assignment created" })
   createInputAssignment(@Body() dto: CreateInputAssignmentDto) {
     return this.producersService.createInputAssignment(dto)
+  }
+
+  @Post("input-returns")
+  @ApiOperation({ summary: "Create input return (devolución)" })
+  @ApiResponse({ status: 201, description: "Input return created" })
+  createInputReturn(@Body() dto: CreateInputReturnDto) {
+    return this.producersService.createInputReturn(dto)
+  }
+
+  @Get("input-returns/all")
+  @ApiOperation({ summary: "Get all input returns" })
+  @ApiResponse({ status: 200, description: "List of input returns" })
+  findAllInputReturns() {
+    return this.producersService.findAllInputReturns()
   }
 
   @Get("input-assignments/all")

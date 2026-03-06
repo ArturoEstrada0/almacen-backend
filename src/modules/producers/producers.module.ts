@@ -5,6 +5,8 @@ import { ProducersController } from "./producers.controller"
 import { Producer } from "./entities/producer.entity"
 import { InputAssignment } from "./entities/input-assignment.entity"
 import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
+import { InputReturn } from "./entities/input-return.entity"
+import { InputReturnItem } from "./entities/input-return-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
 import { ReturnedItem } from "./entities/returned-item.entity"
 import { Shipment } from "./entities/shipment.entity"
@@ -19,6 +21,8 @@ import { InventoryModule } from "../inventory/inventory.module"
       Producer,
       InputAssignment,
       InputAssignmentItem,
+      InputReturn,
+      InputReturnItem,
       FruitReception,
       ReturnedItem,
       Shipment,

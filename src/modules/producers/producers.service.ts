@@ -7,12 +7,15 @@ import { InputAssignment } from "./entities/input-assignment.entity"
 import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
 import { ReturnedItem } from "./entities/returned-item.entity"
+import { InputReturn } from "./entities/input-return.entity"
+import { InputReturnItem } from "./entities/input-return-item.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
 import { PaymentReport } from "./entities/payment-report.entity"
 import { PaymentReportItem } from "./entities/payment-report-item.entity"
 import type { CreateProducerDto } from "./dto/create-producer.dto"
 import type { CreateInputAssignmentDto } from "./dto/create-input-assignment.dto"
+import type { CreateInputReturnDto } from "./dto/create-input-return.dto"
 import type { CreateFruitReceptionDto } from "./dto/create-fruit-reception.dto"
 import type { CreateShipmentDto } from "./dto/create-shipment.dto"
 import type { CreatePaymentDto } from "./dto/create-payment.dto"
@@ -29,6 +32,8 @@ export class ProducersService {
   private inputAssignmentItemsRepository: Repository<InputAssignmentItem>
   private fruitReceptionsRepository: Repository<FruitReception>
   private returnedItemsRepository: Repository<ReturnedItem>
+  private inputReturnsRepository: Repository<any>
+  private inputReturnItemsRepository: Repository<any>
   private shipmentsRepository: Repository<Shipment>
   private accountMovementsRepository: Repository<ProducerAccountMovement>
   private paymentReportsRepository: Repository<PaymentReport>
@@ -47,6 +52,10 @@ export class ProducersService {
     fruitReceptionsRepository: Repository<FruitReception>,
     @InjectRepository(ReturnedItem)
     returnedItemsRepository: Repository<ReturnedItem>,
+    @InjectRepository(InputReturn)
+    inputReturnsRepository: Repository<any>,
+    @InjectRepository(InputReturnItem)
+    inputReturnItemsRepository: Repository<any>,
     @InjectRepository(Shipment)
     shipmentsRepository: Repository<Shipment>,
     @InjectRepository(ProducerAccountMovement)
@@ -63,6 +72,8 @@ export class ProducersService {
     this.inputAssignmentItemsRepository = inputAssignmentItemsRepository
     this.fruitReceptionsRepository = fruitReceptionsRepository
     this.returnedItemsRepository = returnedItemsRepository
+    this.inputReturnsRepository = inputReturnsRepository
+    this.inputReturnItemsRepository = inputReturnItemsRepository
     this.shipmentsRepository = shipmentsRepository
     this.accountMovementsRepository = accountMovementsRepository
     this.paymentReportsRepository = paymentReportsRepository
@@ -268,6 +279,83 @@ export class ProducersService {
     } finally {
       await queryRunner.release()
     }
+  }
+
+  // Input Returns (Devoluciones)
+  async createInputReturn(dto: CreateInputReturnDto): Promise<any> {
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      const total = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
+
+      const trackingFolio = dto.trackingFolio || await this.generateTrackingFolio()
+
+      const inputReturn = this.inputReturnsRepository.create({
+        code: this.generateCode('IR'),
+        trackingFolio,
+        producerId: dto.producerId,
+        warehouseId: dto.warehouseId,
+        date: dto.date || new Date().toISOString().split('T')[0],
+        total,
+        notes: dto.notes,
+      })
+      await queryRunner.manager.save(inputReturn)
+
+      for (const itemDto of dto.items) {
+        const item = this.inputReturnItemsRepository.create({
+          returnId: inputReturn.id,
+          productId: itemDto.productId,
+          quantity: itemDto.quantity,
+          unitPrice: itemDto.unitPrice,
+          total: itemDto.quantity * itemDto.unitPrice,
+        })
+        await queryRunner.manager.save(item)
+      }
+
+      // Create inventory movement (entrada) - devuelve stock al almacén
+      await this.inventoryService.createMovement({
+        type: MovementType.ENTRADA,
+        warehouseId: dto.warehouseId,
+        reference: `Devolución de productor`,
+        notes: dto.notes,
+        items: dto.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      })
+
+      // Create account movement (abono - se acredita al productor)
+      const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
+        where: { producerId: dto.producerId },
+        order: { createdAt: 'DESC' },
+      })
+      const prevBalance = lastMovement ? Number(lastMovement.balance) : 0
+      const newBalance = prevBalance + Number(total)
+
+      const accountMovement = this.accountMovementsRepository.create({
+        producerId: dto.producerId,
+        type: 'abono',
+        amount: total,
+        balance: newBalance,
+        description: `Devolución de insumos`,
+        referenceType: 'input_return',
+        referenceId: inputReturn.id,
+        referenceCode: inputReturn.code,
+      } as any)
+      await queryRunner.manager.save(accountMovement)
+
+      await queryRunner.commitTransaction()
+
+      return await this.inputReturnsRepository.findOne({ where: { id: inputReturn.id }, relations: ['producer', 'warehouse', 'items', 'items.product'] })
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      throw error
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  async findAllInputReturns(): Promise<any[]> {
+    return await this.inputReturnsRepository.find({ relations: ['producer', 'warehouse', 'items', 'items.product'], order: { createdAt: 'DESC' } })
   }
 
   async findAllInputAssignments(): Promise<InputAssignment[]> {
