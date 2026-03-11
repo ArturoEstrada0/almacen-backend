@@ -17,13 +17,25 @@ export class InvoiceImportService {
       parseAttributeValue: false,
       parseNodeValue: false,
       trimValues: true,
+      // Forzar array para elementos de concepto, incluso si solo hay uno
+      isArray: (name: string) => /concepto|concept|linea|detalle|item|producto/i.test(name),
     }
 
     const parser = new XMLParser(options)
     const obj = parser.parse(xml)
 
-    // Buscar nodos de concepto/linea comunes
+    // Buscar nodos de concepto/linea comunes (por atributos o por nombre de elemento)
     const concepts: any[] = []
+
+    /** Comprueba si un objeto parece un concepto de factura */
+    function looksLikeConcept(item: any): boolean {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+      const keys = Object.keys(item)
+      const hasDesc = keys.some((x) => /descripcion|description|concepto|detalle|nombre|producto/i.test(x))
+      const hasQty  = keys.some((x) => /cantidad|quantity|cant\b|qty/i.test(x))
+      const hasPrice = keys.some((x) => /valorunitario|unitprice|precio|price|importe/i.test(x))
+      return (hasDesc || hasQty) && (hasQty || hasPrice)
+    }
 
     function walk(node: any) {
       if (!node || typeof node !== 'object') return
@@ -31,14 +43,12 @@ export class InvoiceImportService {
         const v = node[k]
         if (Array.isArray(v)) {
           for (const item of v) {
-            // heurística: si tiene descripción o Cantidad
-            const keys = Object.keys(item || {})
-            const hasDesc = keys.some((x) => /descripcion|descripcion|Descripcion|Description|DescripcionProducto|concepto|Concepto/i.test(x))
-            const hasQty = keys.some((x) => /cantidad|Cantidad|quantity|Quantity/i.test(x))
-            if (hasDesc || hasQty) concepts.push(item)
+            if (looksLikeConcept(item)) concepts.push(item)
             walk(item)
           }
         } else if (typeof v === 'object') {
+          // Concepto singular que no quedó como array
+          if (looksLikeConcept(v)) concepts.push(v)
           walk(v)
         }
       }
