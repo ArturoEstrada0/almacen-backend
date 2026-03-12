@@ -17,6 +17,7 @@ export class InvoiceImportService {
       parseAttributeValue: false,
       parseNodeValue: false,
       trimValues: true,
+      processEntities: true,   // convierte &#xD; &#xA; &amp; etc.
       // Forzar array para elementos de concepto, incluso si solo hay uno
       isArray: (name: string) => /concepto|concept|linea|detalle|item|producto/i.test(name),
     }
@@ -63,7 +64,14 @@ export class InvoiceImportService {
 
     const lines = await Promise.all(
       concepts.map(async (c: any) => {
-        const description = c.Descripcion || c.descripcion || c.Description || c.description || c.text || ''
+        const rawDesc = c.Descripcion || c.descripcion || c.Description || c.description || c.text || ''
+        const description = rawDesc
+          .toString()
+          .replace(/&#x[0-9A-Fa-f]+;/g, ' ')  // entidades XML hexadecimales: &#xD; &#xA; etc.
+          .replace(/&#[0-9]+;/g, ' ')           // entidades XML decimales: &#13; &#10; etc.
+          .replace(/[\r\n\t]+/g, ' ')            // caracteres de control reales
+          .replace(/\s{2,}/g, ' ')               // espacios múltiples
+          .trim()
         const quantity = Number(c.Cantidad || c.cantidad || c.Quantity || c.quantity || 1)
         const unitPrice = Number(c.ValorUnitario || c.ValorUnitario || c.UnitPrice || c.unitPrice || c.Precio || c.PrecioUnitario || 0)
         const productCode = c.ClaveProdServ || c.NoIdentificacion || c.noIdentificacion || c.sku || c.Codigo || null
