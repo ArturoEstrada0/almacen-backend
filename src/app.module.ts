@@ -10,6 +10,7 @@ import { SuppliersModule } from "./modules/suppliers/suppliers.module"
 import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.module"
 import { ProducersModule } from "./modules/producers/producers.module"
 import { QuotationsModule } from "./modules/quotations/quotations.module"
+import { CustomersModule } from "./modules/customers/customers.module"
 import { AuthModule } from "./modules/auth/auth.module"
 import { ImportsModule } from "./modules/imports/imports.module"
 import { DashboardModule } from "./modules/dashboard/dashboard.module"
@@ -62,11 +63,12 @@ import { MailModule } from "./modules/mail/mail.module"
     NotificationsModule,
     MailModule,
     ProductsModule,
-  CategoriesModule,
-  UnitsModule,
+    CategoriesModule,
+    UnitsModule,
     InventoryModule,
     WarehousesModule,
     SuppliersModule,
+    CustomersModule,
     PurchaseOrdersModule,
     ProducersModule,
     QuotationsModule,

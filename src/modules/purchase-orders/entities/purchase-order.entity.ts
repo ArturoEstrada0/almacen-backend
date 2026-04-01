@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from "typeorm"
 import { Supplier } from "../../suppliers/entities/supplier.entity"
+import { Customer } from "../../customers/entities/customer.entity"
 import { PurchaseOrderItem } from "./purchase-order-item.entity"
 import { Warehouse } from "../../warehouses/entities/warehouse.entity"
 
@@ -26,6 +27,13 @@ export class PurchaseOrder {
   @ManyToOne(() => Supplier)
   @JoinColumn({ name: "supplier_id" })
   supplier: Supplier
+
+  @Column({ name: "customer_id", nullable: true })
+  customerId?: string
+
+  @ManyToOne(() => Customer, { nullable: true })
+  @JoinColumn({ name: "customer_id" })
+  customer?: Customer
 
   @Column({
     type: "enum",
