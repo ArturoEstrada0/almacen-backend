@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Param, Delete, ParseUUIDPipe, Body } from "@nestjs/common"
+import { Controller, Get, Post, Patch, Param, Delete, ParseUUIDPipe, Body, Req } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger"
 import { SuppliersService } from "./suppliers.service"
+import type { Request } from 'express'
 import { CreateSupplierDto } from "./dto/create-supplier.dto"
 import { UpdateSupplierDto } from "./dto/update-supplier.dto"
 
@@ -40,7 +41,7 @@ export class SuppliersController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a supplier' })
   @ApiResponse({ status: 200, description: 'Supplier deleted successfully' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.suppliersService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.suppliersService.remove(id, req as any);
   }
 }

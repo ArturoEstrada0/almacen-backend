@@ -8,6 +8,7 @@ import { type CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto"
 import { type RegisterPaymentDto } from "./dto/register-payment.dto"
 import { InventoryService } from "../inventory/inventory.service"
 import { MovementType } from "../inventory/dto/create-movement.dto"
+import { TraceabilityService } from "../traceability/traceability.service"
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -19,9 +20,10 @@ export class PurchaseOrdersService {
     private purchaseOrderItemsRepository: Repository<PurchaseOrderItem>,
     private inventoryService: InventoryService,
     private dataSource: DataSource,
+    private traceabilityService: TraceabilityService,
   ) {}
 
-  async create(createPurchaseOrderDto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+  async create(createPurchaseOrderDto: CreatePurchaseOrderDto, req?: any): Promise<PurchaseOrder> {
     const queryRunner = this.dataSource.createQueryRunner()
     await queryRunner.connect()
     await queryRunner.startTransaction()
@@ -114,10 +116,107 @@ export class PurchaseOrdersService {
 
       await queryRunner.commitTransaction()
 
-  return await this.findOne((purchaseOrder as any).id)
+      const created = await this.findOne((purchaseOrder as any).id)
+      await this.traceabilityService.record({
+        entityType: 'purchase_order',
+        entityId: (purchaseOrder as any).id,
+        action: 'created',
+        userId: req?.user?.id || req?.user?.username || 'unknown',
+        userName: req?.user?.name || req?.user?.username || 'unknown',
+        details: { changes: createPurchaseOrderDto },
+        result: 'success',
+      })
+      return created
     } catch (error) {
       await queryRunner.rollbackTransaction()
       throw error
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  async update(id: string, updateDto: any, req?: any): Promise<any> {
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+
+    try {
+      const purchaseOrder = await this.loadEntity(id)
+
+      // If any item already has receivedQuantity > 0, block editing
+      const anyReceived = (purchaseOrder.items || []).some((i) => Number(i.receivedQuantity) > 0)
+      if (anyReceived) {
+        throw new BadRequestException('Esta orden no puede editarse porque ya tiene una recepción registrada.')
+      }
+
+      // Disallow supplier change via edit
+      if (updateDto.supplierId && updateDto.supplierId !== (purchaseOrder as any).supplierId) {
+        throw new BadRequestException('Para cambiar el proveedor debe cancelar esta orden y crear una nueva.')
+      }
+
+      const fieldsToUpdate: any = {}
+
+      // Update simple fields
+      if (updateDto.warehouseId !== undefined) {
+        fieldsToUpdate.warehouseId = updateDto.warehouseId
+      }
+      if (updateDto.notes !== undefined) {
+        fieldsToUpdate.notes = updateDto.notes
+      }
+      if (updateDto.expectedDate !== undefined) {
+        fieldsToUpdate.expectedDate = updateDto.expectedDate
+      }
+      if (updateDto.creditDays !== undefined) {
+        const creditDays = Number(updateDto.creditDays) || 0
+        fieldsToUpdate.paymentTerms = creditDays
+        const baseDate = (purchaseOrder as any).date ? new Date((purchaseOrder as any).date) : new Date()
+        const dueDate = new Date(baseDate)
+        dueDate.setDate(dueDate.getDate() + creditDays)
+        fieldsToUpdate.dueDate = dueDate
+      }
+
+      // Replace items if provided
+      if (Array.isArray(updateDto.items)) {
+        // Delete existing items
+        await queryRunner.query(`DELETE FROM purchase_order_items WHERE purchase_order_id = $1`, [id])
+
+        let total = 0
+        for (const item of updateDto.items) {
+          const price = Number(item.unitPrice || item.price || 0)
+          const qty = Number(item.quantity || 0)
+          const itemTotal = (qty * price) || 0
+          total += itemTotal
+
+          await queryRunner.query(
+            `INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, received_quantity, price, total, notes) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [id, item.productId, qty, 0, price.toFixed ? price.toFixed(2) : String(price), itemTotal.toFixed ? itemTotal.toFixed(2) : String(itemTotal), item.notes || null],
+          )
+        }
+
+        fieldsToUpdate.total = total
+      }
+
+      if (Object.keys(fieldsToUpdate).length > 0) {
+        await queryRunner.manager.update(PurchaseOrder, id, fieldsToUpdate)
+      }
+
+      // Commit update
+      await queryRunner.commitTransaction()
+
+      const updated = await this.findOne(id)
+      await this.traceabilityService.record({
+        entityType: 'purchase_order',
+        entityId: id,
+        action: 'updated',
+        userId: req?.user?.id || req?.user?.username || 'unknown',
+        userName: req?.user?.name || req?.user?.username || 'unknown',
+        details: { changes: updateDto },
+        result: 'success',
+      })
+      return updated
+    } catch (err) {
+      await queryRunner.rollbackTransaction()
+      throw err
     } finally {
       await queryRunner.release()
     }
@@ -164,8 +263,14 @@ export class PurchaseOrdersService {
     return po
   }
 
-  async findAll(): Promise<any[]> {
+  async findAll(supplierId?: string): Promise<any[]> {
+    const where: any = {}
+    if (supplierId) {
+      where.supplier = { id: supplierId }
+    }
+
     const list = await this.purchaseOrdersRepository.find({
+      where: Object.keys(where).length ? where : undefined,
       relations: ["supplier", "warehouse", "items", "items.product"],
       order: { createdAt: "DESC" },
     })
@@ -175,7 +280,13 @@ export class PurchaseOrdersService {
 
   async findOne(id: string): Promise<any> {
     const purchaseOrder = await this.loadEntity(id)
-    return this.mapPurchaseOrder(purchaseOrder)
+    const mapped = this.mapPurchaseOrder(purchaseOrder)
+    try {
+      mapped.traceability = await this.traceabilityService.findByEntity('purchase_order', id)
+    } catch {
+      mapped.traceability = []
+    }
+    return mapped
   }
 
   async receive(id: string, itemId: string, quantity: number): Promise<PurchaseOrder> {
@@ -236,10 +347,19 @@ export class PurchaseOrdersService {
     }
   }
 
-  async cancel(id: string): Promise<PurchaseOrder> {
+  async cancel(id: string, req?: any): Promise<PurchaseOrder> {
     const purchaseOrder = await this.loadEntity(id)
     purchaseOrder.status = "cancelada" as any
     await this.purchaseOrdersRepository.save(purchaseOrder as any)
+
+    await this.traceabilityService.record({
+      entityType: 'purchase_order',
+      entityId: id,
+      action: 'cancelled',
+      userId: req?.user?.id || req?.user?.username || 'unknown',
+      userName: req?.user?.name || req?.user?.username || 'unknown',
+      result: 'success',
+    })
 
     // Return mapped response expected by frontend
     return this.mapPurchaseOrder(purchaseOrder) as any
@@ -276,4 +396,5 @@ export class PurchaseOrdersService {
 
     return this.mapPurchaseOrder(purchaseOrder) as any
   }
+
 }

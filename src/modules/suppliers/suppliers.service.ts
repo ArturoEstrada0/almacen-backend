@@ -1,15 +1,23 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { Injectable, NotFoundException, BadRequestException, Logger } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import type { Repository } from "typeorm"
+import { DataSource } from 'typeorm'
+import type { Request } from 'express'
 import { Supplier } from "./entities/supplier.entity"
 import type { CreateSupplierDto } from "./dto/create-supplier.dto"
+import { TraceabilityService } from "../traceability/traceability.service"
 import type { UpdateSupplierDto } from "./dto/update-supplier.dto"
 
 @Injectable()
 export class SuppliersService {
   private suppliersRepository: Repository<Supplier>
+  private readonly logger = new Logger(SuppliersService.name)
 
-  constructor(@InjectRepository(Supplier) suppliersRepository: Repository<Supplier>) {
+  constructor(
+    @InjectRepository(Supplier) suppliersRepository: Repository<Supplier>,
+    private dataSource: DataSource,
+    private traceabilityService: TraceabilityService,
+  ) {
     this.suppliersRepository = suppliersRepository
   }
 
@@ -79,8 +87,52 @@ export class SuppliersService {
     return await this.suppliersRepository.save(supplier)
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, req?: Request): Promise<void> {
     const supplier = await this.findOne(id)
+
+    // Check for active purchase orders (pendiente, parcial)
+    const activeOrdersRes = await this.dataSource.query(
+      `SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = $1 AND status IN ('pendiente','parcial')`,
+      [id],
+    )
+    const activeOrdersCount = Number(activeOrdersRes?.[0]?.count || 0)
+
+    // Check for accounts payable (purchase orders not fully paid)
+    const payablesRes = await this.dataSource.query(
+      `SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = $1 AND (payment_status IS NULL OR payment_status != 'pagado')`,
+      [id],
+    )
+    const payablesCount = Number(payablesRes?.[0]?.count || 0)
+
+    const reasons: string[] = []
+    if (activeOrdersCount > 0) reasons.push('El proveedor tiene órdenes de compra pendientes y no puede eliminarse.')
+    if (payablesCount > 0) reasons.push('El proveedor tiene cuentas por pagar registradas y no puede eliminarse.')
+
+    if (reasons.length > 0) {
+      await this.traceabilityService.record({
+        entityType: 'supplier',
+        entityId: id,
+        action: 'delete_attempt',
+        userId: (req as any)?.user?.id || (req as any)?.user?.username || 'unknown',
+        userName: (req as any)?.user?.name || (req as any)?.user?.username || 'unknown',
+        reason: reasons.join(' | '),
+        details: { activeOrdersCount, payablesCount },
+        result: 'blocked',
+      })
+
+      throw new BadRequestException(reasons.join(' '))
+    }
+
+    // No blocking relations — proceed to delete
     await this.suppliersRepository.remove(supplier)
+
+    await this.traceabilityService.record({
+      entityType: 'supplier',
+      entityId: id,
+      action: 'deleted',
+      userId: (req as any)?.user?.id || (req as any)?.user?.username || 'unknown',
+      userName: (req as any)?.user?.name || (req as any)?.user?.username || 'unknown',
+      result: 'success',
+    })
   }
 }

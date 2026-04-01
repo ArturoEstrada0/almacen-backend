@@ -17,6 +17,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module"
 import { UsersModule } from "./modules/users/users.module"
 import { NotificationsModule } from "./modules/notifications/notifications.module"
 import { MailModule } from "./modules/mail/mail.module"
+import { TraceabilityModule } from "./modules/traceability/traceability.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
@@ -62,6 +63,7 @@ import { MailModule } from "./modules/mail/mail.module"
     UsersModule,
     NotificationsModule,
     MailModule,
+    TraceabilityModule,
     ProductsModule,
     CategoriesModule,
     UnitsModule,
