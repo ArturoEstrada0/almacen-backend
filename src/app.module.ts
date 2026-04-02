@@ -17,6 +17,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module"
 import { UsersModule } from "./modules/users/users.module"
 import { NotificationsModule } from "./modules/notifications/notifications.module"
 import { MailModule } from "./modules/mail/mail.module"
+import { InvoiceImportModule } from './modules/invoice-import/invoice-import.module'
 import { TraceabilityModule } from "./modules/traceability/traceability.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
@@ -76,6 +77,8 @@ import { TraceabilityModule } from "./modules/traceability/traceability.module"
     QuotationsModule,
     // Imports module handles file imports (products, warehouses...)
     ImportsModule,
+    // Invoice import allows uploading XML invoices and mapping items
+    InvoiceImportModule,
   ],
 })
 export class AppModule {}
