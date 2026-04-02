@@ -3,7 +3,7 @@ import * as dns from 'dns'
 import { ValidationPipe } from "@nestjs/common"
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger"
 import { AppModule } from "./app.module"
-import { HttpExceptionFilter } from "./common/filters/http-exception.filter"
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter"
 
 async function bootstrap() {
   // Force DNS to prefer IPv4 addresses first to avoid ENETUNREACH when the
@@ -22,8 +22,8 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule)
 
-  // Global exception filter para manejo de errores amigable
-  app.useGlobalFilters(new HttpExceptionFilter())
+  // Global exception filter — manejo de errores + notificaciones Discord en prod
+  app.useGlobalFilters(new AllExceptionsFilter())
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -80,6 +80,14 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup("api/docs", app, document)
+
+  // ⚠️ ENDPOINT DE PRUEBA — eliminar después de confirmar que Discord recibe el mensaje
+  const httpAdapter: any = app.getHttpAdapter()
+  if (httpAdapter && typeof httpAdapter.get === 'function') {
+    httpAdapter.get('/debug/test-error', (_req: any, _res: any) => {
+      throw new Error('🧪 Error de prueba — si ves esto en Discord, el monitor funciona correctamente.')
+    })
+  }
 
   const port = process.env.PORT || 3001
   await app.listen(port)

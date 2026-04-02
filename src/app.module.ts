@@ -10,6 +10,7 @@ import { SuppliersModule } from "./modules/suppliers/suppliers.module"
 import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.module"
 import { ProducersModule } from "./modules/producers/producers.module"
 import { QuotationsModule } from "./modules/quotations/quotations.module"
+import { CustomersModule } from "./modules/customers/customers.module"
 import { AuthModule } from "./modules/auth/auth.module"
 import { ImportsModule } from "./modules/imports/imports.module"
 import { DashboardModule } from "./modules/dashboard/dashboard.module"
@@ -17,6 +18,7 @@ import { UsersModule } from "./modules/users/users.module"
 import { NotificationsModule } from "./modules/notifications/notifications.module"
 import { MailModule } from "./modules/mail/mail.module"
 import { InvoiceImportModule } from './modules/invoice-import/invoice-import.module'
+import { TraceabilityModule } from "./modules/traceability/traceability.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
@@ -62,12 +64,14 @@ import { InvoiceImportModule } from './modules/invoice-import/invoice-import.mod
     UsersModule,
     NotificationsModule,
     MailModule,
+    TraceabilityModule,
     ProductsModule,
-  CategoriesModule,
-  UnitsModule,
+    CategoriesModule,
+    UnitsModule,
     InventoryModule,
     WarehousesModule,
     SuppliersModule,
+    CustomersModule,
     PurchaseOrdersModule,
     ProducersModule,
     QuotationsModule,

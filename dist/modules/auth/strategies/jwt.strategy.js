@@ -26,10 +26,14 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         this.authService = authService;
     }
     async validate(payload) {
+        const metadataRole = payload?.app_metadata?.role || payload?.user_metadata?.role;
         return {
             userId: payload.sub,
             email: payload.email,
-            role: payload.role,
+            role: metadataRole || payload.role,
+            app_metadata: payload.app_metadata,
+            user_metadata: payload.user_metadata,
+            jwt_role: payload.role,
         };
     }
 };

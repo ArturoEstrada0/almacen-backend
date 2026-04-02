@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Param, Patch, ParseUUIDPipe } from "@nestjs/common"
+import { Controller, Get, Post, Body, Param, Patch, ParseUUIDPipe, Req, Query } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger"
 import { PurchaseOrdersService } from "./purchase-orders.service"
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto"
 import { RegisterPaymentDto } from "./dto/register-payment.dto"
+import { UpdatePurchaseOrderDto } from "./dto/update-purchase-order.dto"
+import type { Request } from 'express'
 
 @ApiTags("purchase-orders")
 @Controller("purchase-orders")
@@ -12,15 +14,15 @@ export class PurchaseOrdersController {
   @Post()
   @ApiOperation({ summary: "Create a new purchase order" })
   @ApiResponse({ status: 201, description: "Purchase order created successfully" })
-  create(@Body() createPurchaseOrderDto: CreatePurchaseOrderDto) {
-    return this.purchaseOrdersService.create(createPurchaseOrderDto)
+  create(@Body() createPurchaseOrderDto: CreatePurchaseOrderDto, @Req() req: Request) {
+    return this.purchaseOrdersService.create(createPurchaseOrderDto, req as any)
   }
 
   @Get()
   @ApiOperation({ summary: "Get all purchase orders" })
   @ApiResponse({ status: 200, description: "List of purchase orders" })
-  findAll() {
-    return this.purchaseOrdersService.findAll()
+  findAll(@Query('supplierId') supplierId?: string) {
+    return this.purchaseOrdersService.findAll(supplierId)
   }
 
   @Get(':id')
@@ -44,8 +46,14 @@ export class PurchaseOrdersController {
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'Cancel a purchase order' })
   @ApiResponse({ status: 200, description: 'Purchase order cancelled' })
-  cancel(@Param('id', ParseUUIDPipe) id: string) {
-    return this.purchaseOrdersService.cancel(id);
+  cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.purchaseOrdersService.cancel(id, req as any);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a purchase order (items and quantities). Supplier cannot be changed.' })
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateDto: UpdatePurchaseOrderDto, @Req() req: Request) {
+    return this.purchaseOrdersService.update(id, updateDto as any, req as any)
   }
 
   @Post(':id/payment')
