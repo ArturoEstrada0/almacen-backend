@@ -19,6 +19,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { MailModule } from "./modules/mail/mail.module"
 import { InvoiceImportModule } from './modules/invoice-import/invoice-import.module'
 import { TraceabilityModule } from "./modules/traceability/traceability.module"
+import { AccountingModule } from "./modules/accounting/accounting.module"
 // DatabaseConfig exists but we prefer to inline DATABASE_URL handling here
 
 @Module({
@@ -65,6 +66,7 @@ import { TraceabilityModule } from "./modules/traceability/traceability.module"
     NotificationsModule,
     MailModule,
     TraceabilityModule,
+    AccountingModule,
     ProductsModule,
     CategoriesModule,
     UnitsModule,

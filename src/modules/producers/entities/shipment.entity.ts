@@ -28,6 +28,24 @@ export class Shipment {
   @Column({ nullable: true })
   carrier: string
 
+  @Column({ name: "customer_id", nullable: true })
+  customerId: string
+
+  @Column({ name: "customer_name", nullable: true })
+  customerName: string
+
+  @Column({ name: "carrier_id", nullable: true })
+  carrierId: string
+
+  @Column({ name: "carrier_name", nullable: true })
+  carrierName: string
+
+  @Column({ name: "invoice_amount", type: "decimal", precision: 10, scale: 2, nullable: true })
+  invoiceAmount: number
+
+  @Column({ name: "carrier_invoice_amount", type: "decimal", precision: 10, scale: 2, nullable: true })
+  carrierInvoiceAmount: number
+
   @Column({ name: "carrier_contact", nullable: true })
   carrierContact: string
 
@@ -57,4 +75,22 @@ export class Shipment {
 
   @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date
+
+  @Column({ name: "invoice_url", type: "varchar", length: 500, nullable: true })
+  invoiceUrl: string
+
+  @Column({ name: "invoice_registered_at", type: "timestamp", nullable: true })
+  invoiceRegisteredAt: Date
+
+  @Column({ name: "carrier_invoice_url", type: "varchar", length: 500, nullable: true })
+  carrierInvoiceUrl: string
+
+  @Column({ name: "carrier_invoice_registered_at", type: "timestamp", nullable: true })
+  carrierInvoiceRegisteredAt: Date
+
+  @Column({ name: "waybill_url", type: "varchar", length: 500, nullable: true })
+  waybillUrl: string
+
+  @Column({ name: "waybill_registered_at", type: "timestamp", nullable: true })
+  waybillRegisteredAt: Date
 }

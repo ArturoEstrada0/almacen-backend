@@ -3,6 +3,8 @@ import { InjectRepository } from "@nestjs/typeorm"
 import type { Repository } from "typeorm"
 import { DataSource, In } from "typeorm"
 import { Producer } from "./entities/producer.entity"
+import { Customer } from "../customers/entities/customer.entity"
+import { Supplier } from "../suppliers/entities/supplier.entity"
 import { InputAssignment } from "./entities/input-assignment.entity"
 import { InputAssignmentItem } from "./entities/input-assignment-item.entity"
 import { FruitReception } from "./entities/fruit-reception.entity"
@@ -24,10 +26,15 @@ import { PaymentReportStatus } from "./dto/create-payment-report.dto"
 import { InventoryService } from "../inventory/inventory.service"
 import { MovementType } from "../inventory/dto/create-movement.dto"
 import { Product } from "../products/entities/product.entity"
+import { TraceabilityService } from "../traceability/traceability.service"
+import { AccountingService } from "../accounting/accounting.service"
+import { ShipmentAccountingEntry } from "../accounting/entities/shipment-accounting-entry.entity"
 
 @Injectable()
 export class ProducersService {
   private producersRepository: Repository<Producer>
+  private customersRepository: Repository<Customer>
+  private suppliersRepository: Repository<Supplier>
   private inputAssignmentsRepository: Repository<InputAssignment>
   private inputAssignmentItemsRepository: Repository<InputAssignmentItem>
   private fruitReceptionsRepository: Repository<FruitReception>
@@ -40,10 +47,16 @@ export class ProducersService {
   private paymentReportItemsRepository: Repository<PaymentReportItem>
   private inventoryService: InventoryService
   private dataSource: DataSource
+  private traceabilityService: TraceabilityService
+  private accountingService: AccountingService
 
   constructor(
     @InjectRepository(Producer)
     producersRepository: Repository<Producer>,
+    @InjectRepository(Customer)
+    customersRepository: Repository<Customer>,
+    @InjectRepository(Supplier)
+    suppliersRepository: Repository<Supplier>,
     @InjectRepository(InputAssignment)
     inputAssignmentsRepository: Repository<InputAssignment>,
     @InjectRepository(InputAssignmentItem)
@@ -66,8 +79,12 @@ export class ProducersService {
     paymentReportItemsRepository: Repository<PaymentReportItem>,
     inventoryService: InventoryService,
     dataSource: DataSource,
+    traceabilityService: TraceabilityService,
+    accountingService: AccountingService,
   ) {
     this.producersRepository = producersRepository
+    this.customersRepository = customersRepository
+    this.suppliersRepository = suppliersRepository
     this.inputAssignmentsRepository = inputAssignmentsRepository
     this.inputAssignmentItemsRepository = inputAssignmentItemsRepository
     this.fruitReceptionsRepository = fruitReceptionsRepository
@@ -80,6 +97,8 @@ export class ProducersService {
     this.paymentReportItemsRepository = paymentReportItemsRepository
     this.inventoryService = inventoryService
     this.dataSource = dataSource
+    this.traceabilityService = traceabilityService
+    this.accountingService = accountingService
   }
 
   private generateCode(prefix: string) {
@@ -133,6 +152,83 @@ export class ProducersService {
     }
     
     return `${datePrefix}-${nextNumber.toString().padStart(3, '0')}`
+  }
+
+  // Map entity fields to the API shape expected by the frontend
+  private mapShipmentForApi(shipment: Shipment | null): any {
+    if (!shipment) return shipment
+    const s: any = { ...shipment }
+    
+    // Get backend URL for absolute URLs in API responses
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001'
+    
+    // Build absolute URLs for file uploads
+    const makeAbsoluteUrl = (path: string | null) => {
+      if (!path) return null
+      if (path.startsWith('http')) return path  // Already absolute
+      return `${backendUrl}${path}`
+    }
+    
+    // Backwards-compatible aliases used by the frontend with absolute URLs
+    s.shipmentInvoiceUrl = makeAbsoluteUrl((shipment as any).invoiceUrl)
+    s.carrierInvoiceUrl = makeAbsoluteUrl((shipment as any).carrierInvoiceUrl)
+    s.waybillComplementUrl = makeAbsoluteUrl((shipment as any).waybillUrl)
+    return s
+  }
+
+  private async resolveCustomerName(customerId?: string | null, fallbackName?: string | null): Promise<{ id?: string | null; name: string }> {
+    if (customerId) {
+      const customer = await this.customersRepository.findOne({ where: { id: customerId } })
+      if (customer?.name) {
+        return { id: customer.id, name: customer.name }
+      }
+    }
+
+    return {
+      id: customerId || null,
+      name: fallbackName || (customerId ? "Cliente" : "Cliente"),
+    }
+  }
+
+  private async resolveCarrierName(carrierId?: string | null, fallbackName?: string | null): Promise<{ id?: string | null; name: string }> {
+    if (carrierId) {
+      const supplier = await this.suppliersRepository.findOne({ where: { id: carrierId } })
+      if (supplier?.name) {
+        return { id: supplier.id, name: supplier.name }
+      }
+    }
+
+    return {
+      id: carrierId || null,
+      name: fallbackName || (carrierId ? "Transportista" : "Transportista"),
+    }
+  }
+
+  private async syncShipmentAccountingEntries(
+    manager: any,
+    shipment: Shipment,
+    dto: Partial<CreateShipmentDto>,
+  ): Promise<any[]> {
+    return this.accountingService.syncShipmentEntries(manager, {
+      shipmentId: shipment.id,
+      shipmentCode: shipment.code,
+      customer: {
+        id: (shipment as any).customerId || (dto as any).customerId || null,
+        name: (shipment as any).customerName || (dto as any).customerName || "Cliente",
+      },
+      carrier: {
+        id: (shipment as any).carrierId || (dto as any).carrierId || null,
+        name: (shipment as any).carrierName || (dto as any).carrierName || shipment.carrier || "Transportista",
+      },
+      customerAmount: Number((shipment as any).invoiceAmount ?? (dto as any).invoiceAmount ?? 0),
+      carrierAmount: Number((shipment as any).carrierInvoiceAmount ?? (dto as any).carrierInvoiceAmount ?? 0),
+      customerDocumentUrl: (shipment as any).invoiceUrl || null,
+      carrierDocumentUrl: (shipment as any).carrierInvoiceUrl || null,
+      customerDocumentRegisteredAt: (shipment as any).invoiceRegisteredAt || null,
+      carrierDocumentRegisteredAt: (shipment as any).carrierInvoiceRegisteredAt || null,
+      customerReferenceNumber: shipment.code,
+      carrierReferenceNumber: shipment.code,
+    })
   }
 
   // Producers CRUD
@@ -746,6 +842,10 @@ export class ProducersService {
       const trackingFolios = [...new Set(receptions.map(r => r.trackingFolio).filter(Boolean))]
       const trackingFolio = trackingFolios.length > 0 ? trackingFolios[0] : null
 
+      const customer = await this.resolveCustomerName((dto as any).customerId, (dto as any).customerName)
+      const carrier = await this.resolveCarrierName((dto as any).carrierId, (dto as any).carrierName || dto.carrier)
+      const now = new Date()
+
       // Solo incluir campos que existen en la entidad Shipment
       const shipment = this.shipmentsRepository.create({
         code: this.generateCode("SH"),
@@ -757,6 +857,18 @@ export class ProducersService {
         carrierContact: dto.driver,
         shippedAt: dto.date ? new Date(dto.date) : new Date(),
         notes: dto.notes,
+        invoiceUrl: (dto as any).invoiceUrl,
+        carrierInvoiceUrl: (dto as any).carrierInvoiceUrl,
+        waybillUrl: (dto as any).waybillUrl,
+        customerId: customer.id,
+        customerName: customer.name,
+        carrierId: carrier.id,
+        carrierName: carrier.name,
+        invoiceAmount: (dto as any).invoiceAmount ?? null,
+        carrierInvoiceAmount: (dto as any).carrierInvoiceAmount ?? null,
+        invoiceRegisteredAt: (dto as any).invoiceUrl ? now : null,
+        carrierInvoiceRegisteredAt: (dto as any).carrierInvoiceUrl ? now : null,
+        waybillRegisteredAt: (dto as any).waybillUrl ? now : null,
       })
       await queryRunner.manager.save(shipment)
 
@@ -800,12 +912,40 @@ export class ProducersService {
         })
       }
 
+      const accountingEntries = await this.syncShipmentAccountingEntries(queryRunner.manager, shipment, dto)
+
+      await this.traceabilityService.record({
+        entityType: "shipment",
+        entityId: shipment.id,
+        action: "created",
+        details: {
+          shipmentCode: shipment.code,
+          customer: customer,
+          carrier: carrier,
+          invoiceAmount: (shipment as any).invoiceAmount ?? null,
+          carrierInvoiceAmount: (shipment as any).carrierInvoiceAmount ?? null,
+          documentTimestamps: {
+            invoiceRegisteredAt: (shipment as any).invoiceRegisteredAt,
+            carrierInvoiceRegisteredAt: (shipment as any).carrierInvoiceRegisteredAt,
+            waybillRegisteredAt: (shipment as any).waybillRegisteredAt,
+          },
+          accountingEntries: accountingEntries.map((entry: any) => ({
+            id: entry.id,
+            entryType: entry.entryType,
+            partyType: entry.partyType,
+            amount: entry.amount,
+          })),
+        },
+        result: "success",
+      })
+
       await queryRunner.commitTransaction()
 
-      return await this.shipmentsRepository.findOne({
+      const created = await this.shipmentsRepository.findOne({
         where: { id: shipment.id },
         relations: ["receptions", "receptions.producer", "receptions.product"],
       })
+      return this.mapShipmentForApi(created)
     } catch (error) {
       await queryRunner.rollbackTransaction()
       throw error
@@ -873,10 +1013,11 @@ export class ProducersService {
       await queryRunner.manager.save(shipment)
       await queryRunner.commitTransaction()
 
-      return await this.shipmentsRepository.findOne({
+      const updated = await this.shipmentsRepository.findOne({
         where: { id },
         relations: ["receptions", "receptions.producer", "receptions.product"],
       })
+      return this.mapShipmentForApi(updated)
     } catch (error) {
       await queryRunner.rollbackTransaction()
       throw error
@@ -886,10 +1027,11 @@ export class ProducersService {
   }
 
   async findAllShipments(): Promise<Shipment[]> {
-    return await this.shipmentsRepository.find({
+    const list = await this.shipmentsRepository.find({
       relations: ["receptions", "receptions.producer", "receptions.product"],
       order: { createdAt: "DESC" },
     })
+    return list.map(s => this.mapShipmentForApi(s))
   }
 
   async updateShipment(id: string, dto: Partial<CreateShipmentDto>): Promise<Shipment> {
@@ -959,14 +1101,63 @@ export class ProducersService {
       if (dto.driver !== undefined) shipment.carrierContact = dto.driver
       if (dto.date) shipment.date = dto.date
       if (dto.notes !== undefined) shipment.notes = dto.notes
+      if ((dto as any).customerId !== undefined) shipment.customerId = (dto as any).customerId
+      if ((dto as any).carrierId !== undefined) shipment.carrierId = (dto as any).carrierId
+      if ((dto as any).customerName !== undefined) shipment.customerName = (dto as any).customerName
+      if ((dto as any).carrierName !== undefined) shipment.carrierName = (dto as any).carrierName
+      if ((dto as any).invoiceAmount !== undefined) shipment.invoiceAmount = (dto as any).invoiceAmount
+      if ((dto as any).carrierInvoiceAmount !== undefined) shipment.carrierInvoiceAmount = (dto as any).carrierInvoiceAmount
+      // Update document URLs if provided
+      const now = new Date()
+      if ((dto as any).invoiceUrl !== undefined) {
+        shipment.invoiceUrl = (dto as any).invoiceUrl
+        shipment.invoiceRegisteredAt = (dto as any).invoiceUrl ? now : shipment.invoiceRegisteredAt
+      }
+      if ((dto as any).carrierInvoiceUrl !== undefined) {
+        shipment.carrierInvoiceUrl = (dto as any).carrierInvoiceUrl
+        shipment.carrierInvoiceRegisteredAt = (dto as any).carrierInvoiceUrl ? now : shipment.carrierInvoiceRegisteredAt
+      }
+      if ((dto as any).waybillUrl !== undefined) {
+        shipment.waybillUrl = (dto as any).waybillUrl
+        shipment.waybillRegisteredAt = (dto as any).waybillUrl ? now : shipment.waybillRegisteredAt
+      }
+
+      const resolvedCustomer = await this.resolveCustomerName((shipment as any).customerId, (shipment as any).customerName)
+      const resolvedCarrier = await this.resolveCarrierName((shipment as any).carrierId, (shipment as any).carrierName || shipment.carrier)
+      shipment.customerId = resolvedCustomer.id || shipment.customerId
+      shipment.customerName = resolvedCustomer.name
+      shipment.carrierId = resolvedCarrier.id || shipment.carrierId
+      shipment.carrierName = resolvedCarrier.name
 
       await queryRunner.manager.save(shipment)
+
+      await this.syncShipmentAccountingEntries(queryRunner.manager, shipment, dto)
+
+      await this.traceabilityService.record({
+        entityType: "shipment",
+        entityId: shipment.id,
+        action: "updated",
+        details: {
+          shipmentCode: shipment.code,
+          customer: resolvedCustomer,
+          carrier: resolvedCarrier,
+          invoiceAmount: (shipment as any).invoiceAmount ?? null,
+          carrierInvoiceAmount: (shipment as any).carrierInvoiceAmount ?? null,
+          documentTimestamps: {
+            invoiceRegisteredAt: (shipment as any).invoiceRegisteredAt,
+            carrierInvoiceRegisteredAt: (shipment as any).carrierInvoiceRegisteredAt,
+            waybillRegisteredAt: (shipment as any).waybillRegisteredAt,
+          },
+        },
+        result: "success",
+      })
       await queryRunner.commitTransaction()
 
-      return await this.shipmentsRepository.findOne({
+      const updated = await this.shipmentsRepository.findOne({
         where: { id },
         relations: ["receptions", "receptions.producer", "receptions.product"],
       })
+      return this.mapShipmentForApi(updated)
     } catch (error) {
       await queryRunner.rollbackTransaction()
       throw error
@@ -1001,6 +1192,12 @@ export class ProducersService {
         reception.shipmentStatus = 'pendiente'
         await queryRunner.manager.save(reception)
       }
+
+      // Eliminar movimientos contables asociados al viaje
+      await queryRunner.manager.query(
+        `DELETE FROM shipment_accounting_entries WHERE shipment_id = $1`,
+        [id],
+      )
 
       // Eliminar el embarque
       await queryRunner.manager.remove(shipment)
