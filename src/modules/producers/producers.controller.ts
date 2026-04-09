@@ -11,6 +11,7 @@ import * as multer from 'multer'
 import { promises as fs } from 'fs'
 import { join } from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { zipSync } from 'fflate'
 
 /**
  * Save files to Supabase Storage (bucket 'uploads', folder 'shipments').
@@ -33,11 +34,39 @@ async function saveFilesToUploads(files: Record<string, any[]> | undefined) {
     ? createClient(supabaseUrl as string, supabaseKey as string, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
+  const toZipFile = (file: any) => {
+    const originalName = String(file.originalname || 'file')
+    const isZip = (file.mimetype || '').toLowerCase() === 'application/zip' || /\.zip$/i.test(originalName)
+    if (isZip) {
+      return {
+        buffer: Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer),
+        originalname: originalName,
+        mimetype: 'application/zip',
+      }
+    }
+
+    const cleanBase = originalName.replace(/\.[^/.]+$/, '')
+    const zipName = `${cleanBase}.zip`
+    const zippedBytes = zipSync(
+      {
+        [originalName]: new Uint8Array(Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer)),
+      },
+      { level: 9 }
+    )
+
+    return {
+      buffer: Buffer.from(zippedBytes as unknown as ArrayBuffer),
+      originalname: zipName,
+      mimetype: 'application/zip',
+    }
+  }
+
   for (const key of Object.keys(files)) {
     const arr = files[key]
     if (!arr || arr.length === 0) continue
     const file = arr[0]
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_')
+    const zipped = toZipFile(file)
+    const safeName = zipped.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_')
     const filename = `${Date.now()}-${safeName}`
 
     // Try Supabase upload first
@@ -45,8 +74,8 @@ async function saveFilesToUploads(files: Record<string, any[]> | undefined) {
       try {
         const bucket = 'uploads'
         const path = `shipments/${filename}`
-        const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file.buffer, {
-          contentType: file.mimetype,
+        const { error: uploadError } = await supabase.storage.from(bucket).upload(path, zipped.buffer, {
+          contentType: zipped.mimetype,
           upsert: false,
         })
 
@@ -78,7 +107,7 @@ async function saveFilesToUploads(files: Record<string, any[]> | undefined) {
       const dirExists = await fs.stat(base).then(() => true).catch(() => false)
       if (!dirExists) await fs.mkdir(base, { recursive: true })
       const dest = join(base, filename)
-      await fs.writeFile(dest, file.buffer)
+      await fs.writeFile(dest, zipped.buffer)
       result[key] = `/uploads/shipments/${filename}`
     } catch (err) {
       console.error('[uploads] local write failed for', filename, err?.message || err)
