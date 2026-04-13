@@ -249,8 +249,18 @@ export class ProducersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: 'embarcada' | 'recibida' | 'vendida',
     @Body('salePrice') salePrice?: number,
+    @Body('saleDate') saleDate?: string,
+    @Body('invoiceDate') invoiceDate?: string,
+    @Body('invoiceNumber') invoiceNumber?: string,
   ) {
-    return this.producersService.updateShipmentStatus(id, status, salePrice)
+    return this.producersService.updateShipmentStatus(id, status, salePrice, saleDate, invoiceDate, invoiceNumber)
+  }
+
+  @Post("shipments/sync-receivables")
+  @ApiOperation({ summary: "Sync customer receivables from sold shipments" })
+  @ApiResponse({ status: 200, description: "Receivables sync completed" })
+  syncSoldShipmentsReceivables() {
+    return this.producersService.syncSoldShipmentsReceivables()
   }
 
   @Patch("shipments/:id")

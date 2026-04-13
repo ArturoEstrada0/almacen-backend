@@ -15,6 +15,7 @@ import { PaymentReport } from "./entities/payment-report.entity"
 import { PaymentReportItem } from "./entities/payment-report-item.entity"
 import { InventoryModule } from "../inventory/inventory.module"
 import { Customer } from "../customers/entities/customer.entity"
+import { CustomerReceivableInvoice } from "../customers/entities/customer-receivable.entity"
 import { Supplier } from "../suppliers/entities/supplier.entity"
 import { TraceabilityModule } from "../traceability/traceability.module"
 import { AccountingModule } from "../accounting/accounting.module"
@@ -31,6 +32,7 @@ import { AccountingModule } from "../accounting/accounting.module"
       ReturnedItem,
       Shipment,
       Customer,
+      CustomerReceivableInvoice,
       Supplier,
       ProducerAccountMovement,
       PaymentReport,

@@ -13,6 +13,7 @@ import { InputReturn } from "./entities/input-return.entity"
 import { InputReturnItem } from "./entities/input-return-item.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
+import { CustomerReceivableInvoice } from "../customers/entities/customer-receivable.entity"
 import { PaymentReport } from "./entities/payment-report.entity"
 import { PaymentReportItem } from "./entities/payment-report-item.entity"
 import type { CreateProducerDto } from "./dto/create-producer.dto"
@@ -45,6 +46,7 @@ export class ProducersService {
   private accountMovementsRepository: Repository<ProducerAccountMovement>
   private paymentReportsRepository: Repository<PaymentReport>
   private paymentReportItemsRepository: Repository<PaymentReportItem>
+  private customerReceivablesRepository: Repository<CustomerReceivableInvoice>
   private inventoryService: InventoryService
   private dataSource: DataSource
   private traceabilityService: TraceabilityService
@@ -77,6 +79,8 @@ export class ProducersService {
     paymentReportsRepository: Repository<PaymentReport>,
     @InjectRepository(PaymentReportItem)
     paymentReportItemsRepository: Repository<PaymentReportItem>,
+    @InjectRepository(CustomerReceivableInvoice)
+    customerReceivablesRepository: Repository<CustomerReceivableInvoice>,
     inventoryService: InventoryService,
     dataSource: DataSource,
     traceabilityService: TraceabilityService,
@@ -95,6 +99,7 @@ export class ProducersService {
     this.accountMovementsRepository = accountMovementsRepository
     this.paymentReportsRepository = paymentReportsRepository
     this.paymentReportItemsRepository = paymentReportItemsRepository
+    this.customerReceivablesRepository = customerReceivablesRepository
     this.inventoryService = inventoryService
     this.dataSource = dataSource
     this.traceabilityService = traceabilityService
@@ -954,7 +959,14 @@ export class ProducersService {
     }
   }
 
-  async updateShipmentStatus(id: string, status: 'embarcada' | 'en-transito' | 'recibida' | 'vendida', salePrice?: number): Promise<Shipment> {
+  async updateShipmentStatus(
+    id: string,
+    status: 'embarcada' | 'en-transito' | 'recibida' | 'vendida',
+    salePrice?: number,
+    saleDate?: string,
+    invoiceDate?: string,
+    invoiceNumber?: string,
+  ): Promise<Shipment> {
     const queryRunner = this.dataSource.createQueryRunner()
     await queryRunner.connect()
     await queryRunner.startTransaction()
@@ -975,18 +987,22 @@ export class ProducersService {
         shipment.receivedAt = new Date()
       }
 
-      if (status === "vendida" && salePrice) {
-        // Save sale price per box and total sale on shipment
-        shipment.salePricePerBox = salePrice
-        shipment.totalSale = Number((Number(shipment.totalBoxes || 0) * Number(salePrice)).toFixed(2))
+      if (status === "vendida") {
+        // Determine effective sale price: prefer provided salePrice, fallback to stored shipment.salePricePerBox
+        const effectiveSalePrice = typeof salePrice === 'number' && !Number.isNaN(salePrice) ? salePrice : shipment.salePricePerBox
 
-        // Create account movements for each producer (abono - we owe them)
-        for (const reception of shipment.receptions) {
-          const amount = reception.boxes * salePrice
-          reception.pricePerBox = salePrice
-          reception.finalTotal = amount
-          reception.shipmentStatus = "vendida"
-          await queryRunner.manager.save(reception)
+        if (effectiveSalePrice) {
+          // Save sale price per box and total sale on shipment
+          shipment.salePricePerBox = effectiveSalePrice
+          shipment.totalSale = Number((Number(shipment.totalBoxes || 0) * Number(effectiveSalePrice)).toFixed(2))
+
+          // Create account movements for each producer (abono - we owe them)
+          for (const reception of shipment.receptions) {
+            const amount = Number(reception.boxes || 0) * Number(effectiveSalePrice)
+            reception.pricePerBox = effectiveSalePrice
+            reception.finalTotal = amount
+            reception.shipmentStatus = "vendida"
+            await queryRunner.manager.save(reception)
 
             // compute previous balance for this producer
             const lastMovement = await queryRunner.manager.findOne(ProducerAccountMovement, {
@@ -1001,12 +1017,88 @@ export class ProducersService {
               type: "abono",
               amount,
               balance: newBalance,
-              description: `Venta de embarque - ${shipment.totalBoxes} cajas a $${salePrice}`,
+              description: `Venta de embarque - ${shipment.totalBoxes} cajas a $${effectiveSalePrice}`,
               referenceType: "shipment",
               referenceId: shipment.id,
               referenceCode: shipment.code,
             } as any)
             await queryRunner.manager.save(accountMovement)
+          }
+        }
+
+        // If shipment has an associated customer and we have a known total, create/update a customer receivable (invoice)
+        const knownTotal = Number(shipment.totalSale || 0)
+        if (shipment.customerId && knownTotal > 0) {
+          const customer = await queryRunner.manager.findOne(Customer, { where: { id: shipment.customerId } })
+
+          const saleDateParsed = saleDate
+            ? new Date(`${saleDate}T00:00:00`)
+            : new Date()
+          const invoiceDateParsed = invoiceDate
+            ? new Date(`${invoiceDate}T00:00:00`)
+            : (shipment.invoiceRegisteredAt
+              ? new Date(shipment.invoiceRegisteredAt)
+              : saleDateParsed)
+          const normalizedInvoiceNumber = String(invoiceNumber || shipment.code || '').trim()
+
+          // compute invoice and due dates
+          const creditDays = (customer && typeof customer.creditDays === 'number') ? customer.creditDays : 0
+          const dueDate = new Date(invoiceDateParsed)
+          dueDate.setDate(dueDate.getDate() + creditDays)
+
+          const originalAmount = knownTotal
+          let existingReceivable = await queryRunner.manager.findOne(CustomerReceivableInvoice, {
+            where: {
+              customerId: shipment.customerId,
+              invoiceNumber: normalizedInvoiceNumber,
+            },
+          })
+
+          if (!existingReceivable && normalizedInvoiceNumber !== shipment.code) {
+            existingReceivable = await queryRunner.manager.findOne(CustomerReceivableInvoice, {
+              where: {
+                customerId: shipment.customerId,
+                invoiceNumber: shipment.code,
+              },
+            })
+          }
+
+          if (!existingReceivable) {
+            const statusForInvoice = originalAmount <= 0 ? 'pagada' : (dueDate < new Date() ? 'vencida' : 'pendiente')
+            const receivable = this.customerReceivablesRepository.create({
+              customerId: shipment.customerId,
+              invoiceNumber: normalizedInvoiceNumber,
+              saleDate: saleDateParsed,
+              invoiceDate: invoiceDateParsed,
+              creditDays,
+              dueDate,
+              originalAmount,
+              paidAmount: 0,
+              balanceAmount: originalAmount,
+              status: statusForInvoice,
+              notes: `Venta de embarque ${shipment.code}`,
+            } as any)
+
+            await queryRunner.manager.save(receivable)
+          } else {
+            const paidAmount = Number(existingReceivable.paidAmount || 0)
+            const newBalance = Math.max(0, Number((originalAmount - paidAmount).toFixed(2)))
+            const recalculatedStatus = newBalance <= 0
+              ? 'pagada'
+              : (dueDate < new Date() ? 'vencida' : (paidAmount > 0 ? 'parcial' : 'pendiente'))
+
+            existingReceivable.invoiceNumber = normalizedInvoiceNumber
+            existingReceivable.saleDate = saleDateParsed
+            existingReceivable.invoiceDate = invoiceDateParsed
+            existingReceivable.creditDays = creditDays
+            existingReceivable.dueDate = dueDate
+            existingReceivable.originalAmount = originalAmount
+            existingReceivable.balanceAmount = newBalance
+            existingReceivable.status = recalculatedStatus
+            existingReceivable.notes = `Venta de embarque ${shipment.code}`
+
+            await queryRunner.manager.save(existingReceivable)
+          }
         }
       }
 
@@ -1023,6 +1115,86 @@ export class ProducersService {
       throw error
     } finally {
       await queryRunner.release()
+    }
+  }
+
+  async syncSoldShipmentsReceivables(): Promise<{ processed: number; created: number; updated: number; skipped: number }> {
+    const soldShipments = await this.shipmentsRepository.find({
+      where: { status: 'vendida' as any },
+      order: { createdAt: 'DESC' },
+    })
+
+    let created = 0
+    let updated = 0
+    let skipped = 0
+
+    for (const shipment of soldShipments) {
+      const customerId = shipment.customerId
+      const originalAmount = Number(shipment.totalSale || 0)
+
+      if (!customerId || originalAmount <= 0) {
+        skipped += 1
+        continue
+      }
+
+      const customer = await this.customersRepository.findOne({ where: { id: customerId } })
+      const creditDays = customer?.creditDays || 0
+      const saleDateParsed = shipment.updatedAt ? new Date(shipment.updatedAt) : new Date()
+      const invoiceDateParsed = shipment.invoiceRegisteredAt
+        ? new Date(shipment.invoiceRegisteredAt)
+        : (shipment.date ? new Date(`${shipment.date}T00:00:00`) : saleDateParsed)
+      const dueDate = new Date(invoiceDateParsed)
+      dueDate.setDate(dueDate.getDate() + creditDays)
+
+      const invoiceNumber = String(shipment.code || '').trim()
+      const existing = await this.customerReceivablesRepository.findOne({
+        where: { customerId, invoiceNumber },
+      })
+
+      if (!existing) {
+        const statusForInvoice = originalAmount <= 0 ? 'pagada' : (dueDate < new Date() ? 'vencida' : 'pendiente')
+        const receivable = this.customerReceivablesRepository.create({
+          customerId,
+          invoiceNumber,
+          saleDate: saleDateParsed,
+          invoiceDate: invoiceDateParsed,
+          creditDays,
+          dueDate,
+          originalAmount,
+          paidAmount: 0,
+          balanceAmount: originalAmount,
+          status: statusForInvoice,
+          notes: `Venta de embarque ${shipment.code}`,
+        } as any)
+
+        await this.customerReceivablesRepository.save(receivable)
+        created += 1
+      } else {
+        const paidAmount = Number(existing.paidAmount || 0)
+        const newBalance = Math.max(0, Number((originalAmount - paidAmount).toFixed(2)))
+        const recalculatedStatus = newBalance <= 0
+          ? 'pagada'
+          : (dueDate < new Date() ? 'vencida' : (paidAmount > 0 ? 'parcial' : 'pendiente'))
+
+        existing.saleDate = saleDateParsed
+        existing.invoiceDate = invoiceDateParsed
+        existing.creditDays = creditDays
+        existing.dueDate = dueDate
+        existing.originalAmount = originalAmount
+        existing.balanceAmount = newBalance
+        existing.status = recalculatedStatus
+        existing.notes = `Venta de embarque ${shipment.code}`
+
+        await this.customerReceivablesRepository.save(existing)
+        updated += 1
+      }
+    }
+
+    return {
+      processed: soldShipments.length,
+      created,
+      updated,
+      skipped,
     }
   }
 

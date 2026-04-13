@@ -63,6 +63,53 @@ async function ensureShipmentSchema(dataSource: DataSource) {
   }
 }
 
+async function ensureCustomerReceivablesSchema(dataSource: DataSource) {
+  try {
+    await dataSource.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
+    await dataSource.query(`CREATE TABLE IF NOT EXISTS customer_receivables (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+      invoice_number VARCHAR(100) NOT NULL,
+      sale_date DATE NOT NULL,
+      invoice_date DATE NOT NULL,
+      credit_days INT NOT NULL DEFAULT 0,
+      due_date DATE NOT NULL,
+      original_amount DECIMAL(12,2) NOT NULL,
+      paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+      balance_amount DECIMAL(12,2) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+      notes TEXT,
+      created_by_user_id VARCHAR(100),
+      created_by_user_name VARCHAR(255),
+      last_payment_at TIMESTAMP,
+      last_payment_reference VARCHAR(120),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(customer_id, invoice_number)
+    );`)
+
+    await dataSource.query(`CREATE TABLE IF NOT EXISTS customer_receivable_payments (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      receivable_id UUID NOT NULL REFERENCES customer_receivables(id) ON DELETE CASCADE,
+      customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+      payment_date DATE NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      reference VARCHAR(255),
+      captured_by_user_id VARCHAR(100),
+      captured_by_user_name VARCHAR(255),
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`)
+
+    await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_customer_receivables_customer_status ON customer_receivables(customer_id, status);`)
+    await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_customer_receivables_due_date ON customer_receivables(due_date);`)
+    await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_customer_receivable_payments_receivable_date ON customer_receivable_payments(receivable_id, payment_date);`)
+    await dataSource.query(`ALTER TABLE customer_receivable_payments ADD COLUMN IF NOT EXISTS invoice_file_url TEXT;`)
+  } catch (err) {
+    console.warn('Customer receivables schema could not be fully initialized:', err?.message || err)
+  }
+}
+
 async function bootstrap() {
   // Force DNS to prefer IPv4 addresses first to avoid ENETUNREACH when the
   // environment/container has no IPv6 connectivity (common on some PaaS).
@@ -125,6 +172,12 @@ async function bootstrap() {
     await ensureShipmentSchema(app.get(DataSource))
   } catch (err) {
     console.warn('Could not ensure shipment schema:', err?.message || err)
+  }
+
+  try {
+    await ensureCustomerReceivablesSchema(app.get(DataSource))
+  } catch (err) {
+    console.warn('Could not ensure customer receivables schema:', err?.message || err)
   }
 
   // Serve uploaded files under /uploads
