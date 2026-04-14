@@ -21,4 +21,14 @@ export class RegisterPaymentDto {
   @IsString()
   @IsOptional()
   notes?: string
+
+  @ApiProperty({ example: "2026-04-13", required: false, description: "Fecha del pago" })
+  @IsString()
+  @IsOptional()
+  paymentDate?: string
+
+  @ApiProperty({ example: "https://.../factura.pdf", required: false, description: "URL pública de factura adjunta" })
+  @IsString()
+  @IsOptional()
+  invoiceFileUrl?: string
 }

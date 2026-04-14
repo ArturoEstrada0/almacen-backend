@@ -189,6 +189,14 @@ export class CustomersController {
     return this.customersService.listReceivables(id)
   }
 
+  @Get("receivables/pending")
+  @Roles("admin")
+  @ApiOperation({ summary: "Listar cuentas por cobrar pendientes (global)" })
+  @ApiResponse({ status: 200, description: "Listado de cuentas por cobrar pendientes" })
+  findPendingReceivables(@Query('customerId') customerId?: string, @Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
+    return this.customersService.findPendingReceivables({ customerId, startDate, endDate })
+  }
+
   @Post(":id/receivables")
   @Roles("admin")
   @ApiOperation({ summary: "Registrar venta / factura a crédito" })

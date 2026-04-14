@@ -4,6 +4,7 @@ import type { Repository } from "typeorm"
 import { DataSource } from "typeorm"
 import { PurchaseOrder } from "./entities/purchase-order.entity"
 import { PurchaseOrderItem } from "./entities/purchase-order-item.entity"
+import { PurchaseOrderPayment } from "./entities/purchase-order-payment.entity"
 import { type CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto"
 import { type RegisterPaymentDto } from "./dto/register-payment.dto"
 import { InventoryService } from "../inventory/inventory.service"
@@ -13,11 +14,29 @@ import { TraceabilityService } from "../traceability/traceability.service"
 @Injectable()
 export class PurchaseOrdersService {
   private readonly logger = new Logger(PurchaseOrdersService.name)
+  private extractShipmentNumber(notes?: string | null, fallbackValue?: string | null): string | null {
+    const rawNotes = String(notes || "")
+    const noteMatch = rawNotes.match(/embarque\s*[:#-]?\s*([A-Za-z0-9-]+)/i)
+    if (noteMatch?.[1]) {
+      return noteMatch[1]
+    }
+
+    const fallbackCandidate = String(fallbackValue || "").trim()
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fallbackCandidate)
+    if (fallbackCandidate && !isUuid) {
+      return fallbackCandidate
+    }
+
+    return null
+  }
+
   constructor(
     @InjectRepository(PurchaseOrder)
     private purchaseOrdersRepository: Repository<PurchaseOrder>,
     @InjectRepository(PurchaseOrderItem)
     private purchaseOrderItemsRepository: Repository<PurchaseOrderItem>,
+    @InjectRepository(PurchaseOrderPayment)
+    private purchaseOrderPaymentsRepository: Repository<PurchaseOrderPayment>,
     private inventoryService: InventoryService,
     private dataSource: DataSource,
     private traceabilityService: TraceabilityService,
@@ -226,7 +245,7 @@ export class PurchaseOrdersService {
   private async loadEntity(id: string): Promise<PurchaseOrder> {
     const purchaseOrder = await this.purchaseOrdersRepository.findOne({
       where: { id },
-      relations: ["supplier", "warehouse", "items", "items.product"],
+      relations: ["supplier", "warehouse", "items", "items.product", "payments"],
     })
 
     if (!purchaseOrder) {
@@ -260,6 +279,13 @@ export class PurchaseOrdersService {
       total: it.total !== undefined && it.total !== null ? Number(it.total) : undefined,
     }))
 
+    po.payments = [...(purchaseOrder.payments || [])]
+      .sort((a: any, b: any) => new Date(a.createdAt || a.paymentDate || 0).getTime() - new Date(b.createdAt || b.paymentDate || 0).getTime())
+      .map((payment: any) => ({
+        ...payment,
+        amount: payment.amount !== undefined ? Number(payment.amount) : 0,
+      }))
+
     return po
   }
 
@@ -271,7 +297,7 @@ export class PurchaseOrdersService {
 
     const list = await this.purchaseOrdersRepository.find({
       where: Object.keys(where).length ? where : undefined,
-      relations: ["supplier", "warehouse", "items", "items.product"],
+      relations: ["supplier", "warehouse", "items", "items.product", "payments"],
       order: { createdAt: "DESC" },
     })
 
@@ -287,6 +313,53 @@ export class PurchaseOrdersService {
       mapped.traceability = []
     }
     return mapped
+  }
+
+  /**
+   * Find purchase orders that have a pending balance (total - amount_paid > 0)
+   * Optional filters: supplierId, startDate, endDate (filter by due date range)
+   */
+  async findPending(opts?: { supplierId?: string; startDate?: string; endDate?: string }): Promise<any[]> {
+    const qb = this.purchaseOrdersRepository.createQueryBuilder('po')
+      .leftJoinAndSelect('po.supplier', 'supplier')
+      .where('(COALESCE(po.total::numeric,0) - COALESCE(po.amount_paid::numeric,0)) > 0')
+
+    if (opts?.supplierId) {
+      qb.andWhere('po.supplier_id = :supplierId', { supplierId: opts.supplierId })
+    }
+
+    if (opts?.startDate) {
+      qb.andWhere('po.due_date >= :startDate', { startDate: opts.startDate })
+    }
+
+    if (opts?.endDate) {
+      qb.andWhere('po.due_date <= :endDate', { endDate: opts.endDate })
+    }
+
+    qb.orderBy('po.due_date', 'ASC')
+
+    const orders = await qb.getMany()
+
+    // Map to API shape with pending amount and supplier info
+    return orders.map((po: any) => {
+      const total = Number(po.total || 0)
+      const amountPaid = Number(po.amountPaid || po.amount_paid || 0)
+      const pending = Math.max(0, total - amountPaid)
+
+      return {
+        id: po.id,
+        code: po.code,
+        supplierId: po.supplierId,
+        supplierName: po.supplier ? (po.supplier.name || po.supplier.fullName || po.supplier.companyName) : null,
+        shipmentId: (po as any).shipmentId || null,
+        shipmentNumber: this.extractShipmentNumber((po as any).notes, (po as any).shipmentId || null),
+        total,
+        date: po.date,
+        dueDate: po.dueDate,
+        amountPaid,
+        pendingAmount: pending,
+      }
+    })
   }
 
   async receive(id: string, itemId: string, quantity: number): Promise<PurchaseOrder> {
@@ -366,35 +439,65 @@ export class PurchaseOrdersService {
   }
 
   async registerPayment(id: string, registerPaymentDto: RegisterPaymentDto): Promise<PurchaseOrder> {
-    const purchaseOrder = await this.loadEntity(id)
-    
-    // Calcular nuevo monto pagado
-    const currentAmountPaid = Number(purchaseOrder.amountPaid) || 0
-    const newAmountPaid = currentAmountPaid + Number(registerPaymentDto.amount)
-    const total = Number(purchaseOrder.total)
+    // Use a transaction to avoid saving a payment if updating the purchase order fails
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
 
-    // Validar que no se pague más del total
-    if (newAmountPaid > total) {
-      throw new BadRequestException(`El monto total pagado ($${newAmountPaid}) excede el total de la orden ($${total})`)
+    try {
+      const purchaseOrder = await this.loadEntity(id)
+
+      const amount = Number(registerPaymentDto.amount || 0)
+      if (amount <= 0) {
+        throw new BadRequestException("El monto del pago debe ser mayor a cero")
+      }
+
+      const currentAmountPaid = Number(purchaseOrder.amountPaid) || 0
+      const newAmountPaid = currentAmountPaid + amount
+      const total = Number(purchaseOrder.total)
+
+      if (newAmountPaid > total) {
+        throw new BadRequestException(`El monto total pagado ($${newAmountPaid}) excede el total de la orden ($${total})`)
+      }
+
+      ;(purchaseOrder as any).amountPaid = newAmountPaid
+
+      if (newAmountPaid >= total) {
+        ;(purchaseOrder as any).paymentStatus = "pagado"
+      } else if (newAmountPaid > 0) {
+        ;(purchaseOrder as any).paymentStatus = "parcial"
+      } else {
+        ;(purchaseOrder as any).paymentStatus = "pendiente"
+      }
+
+      // Persist changes and create payment inside the same transaction
+      await queryRunner.manager.save(purchaseOrder as any)
+
+      const paymentDate = registerPaymentDto.paymentDate ? new Date(registerPaymentDto.paymentDate) : new Date()
+
+      const payment = this.purchaseOrderPaymentsRepository.create({
+        purchaseOrderId: id,
+        paymentDate,
+        amount,
+        reference: registerPaymentDto.reference || registerPaymentDto.paymentMethod,
+        notes: registerPaymentDto.notes,
+        invoiceFileUrl: registerPaymentDto.invoiceFileUrl,
+      })
+
+      await queryRunner.manager.save(payment)
+
+      await queryRunner.commitTransaction()
+
+      this.logger.log(`Payment registered for order ${id}: $${amount}. Total paid: $${newAmountPaid}/${total}`)
+
+      return this.findOne(id)
+    } catch (error) {
+      await queryRunner.rollbackTransaction()
+      this.logger.error(`Failed to register payment for order ${id}: ${error}`)
+      throw error
+    } finally {
+      await queryRunner.release()
     }
-
-    // Actualizar monto pagado
-    ;(purchaseOrder as any).amountPaid = newAmountPaid
-
-    // Actualizar estado de pago
-    if (newAmountPaid >= total) {
-      ;(purchaseOrder as any).paymentStatus = "pagado"
-    } else if (newAmountPaid > 0) {
-      ;(purchaseOrder as any).paymentStatus = "parcial"
-    } else {
-      ;(purchaseOrder as any).paymentStatus = "pendiente"
-    }
-
-    await this.purchaseOrdersRepository.save(purchaseOrder as any)
-
-    this.logger.log(`Payment registered for order ${id}: $${registerPaymentDto.amount}. Total paid: $${newAmountPaid}/${total}`)
-
-    return this.mapPurchaseOrder(purchaseOrder) as any
   }
 
 }

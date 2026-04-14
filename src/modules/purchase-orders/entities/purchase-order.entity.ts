@@ -11,6 +11,7 @@ import {
 import { Supplier } from "../../suppliers/entities/supplier.entity"
 import { Customer } from "../../customers/entities/customer.entity"
 import { PurchaseOrderItem } from "./purchase-order-item.entity"
+import { PurchaseOrderPayment } from "./purchase-order-payment.entity"
 import { Warehouse } from "../../warehouses/entities/warehouse.entity"
 
 @Entity("purchase_orders")
@@ -86,6 +87,9 @@ export class PurchaseOrder {
     { cascade: true },
   )
   items: PurchaseOrderItem[]
+
+  @OneToMany(() => PurchaseOrderPayment, (payment) => payment.purchaseOrder)
+  payments: PurchaseOrderPayment[]
 
   @Column({ name: "warehouse_id", nullable: true })
   warehouseId: string

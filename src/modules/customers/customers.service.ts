@@ -12,6 +12,27 @@ import { TraceabilityService } from "../traceability/traceability.service"
 
 @Injectable()
 export class CustomersService {
+  private extractShipmentNumber(notes?: string | null, fallbackValue?: string | null, invoiceNumber?: string | null): string | null {
+    const rawNotes = String(notes || "")
+    const noteMatch = rawNotes.match(/embarque\s*[:#-]?\s*([A-Za-z0-9-]+)/i)
+    if (noteMatch?.[1]) {
+      return noteMatch[1]
+    }
+
+    const invoiceCandidate = String(invoiceNumber || "").trim()
+    if (/^(EMB|SHIP|TRK|ENV|VIAJE)[A-Za-z0-9-]*$/i.test(invoiceCandidate)) {
+      return invoiceCandidate
+    }
+
+    const fallbackCandidate = String(fallbackValue || "").trim()
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fallbackCandidate)
+    if (fallbackCandidate && !isUuid) {
+      return fallbackCandidate
+    }
+
+    return null
+  }
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(Customer)
@@ -475,6 +496,37 @@ export class CustomersService {
     )
 
     return { customer, totals, receivables }
+  }
+
+  /**
+   * Find pending receivables across customers with optional date range filter
+   */
+  async findPendingReceivables(opts?: { customerId?: string; startDate?: string; endDate?: string }) {
+    const qb = this.receivablesRepository.createQueryBuilder('r')
+      .leftJoinAndSelect('r.customer', 'customer')
+      .where('COALESCE(r.balance_amount::numeric,0) > 0')
+
+    if (opts?.customerId) qb.andWhere('r.customer_id = :customerId', { customerId: opts.customerId })
+    if (opts?.startDate) qb.andWhere('r.due_date >= :startDate', { startDate: opts.startDate })
+    if (opts?.endDate) qb.andWhere('r.due_date <= :endDate', { endDate: opts.endDate })
+
+    qb.orderBy('r.due_date', 'ASC')
+
+    const rows = await qb.getMany()
+
+    return rows.map((r: any) => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      customerId: r.customerId,
+      customerName: r.customer ? (r.customer.name || r.customer.fullName) : null,
+      shipmentId: (r as any).shipmentId || null,
+      shipmentNumber: this.extractShipmentNumber((r as any).notes, (r as any).shipmentId || null, r.invoiceNumber),
+      total: Number(r.originalAmount || 0),
+      date: r.saleDate,
+      dueDate: r.dueDate,
+      amountPaid: Number(r.paidAmount || 0),
+      pendingAmount: Math.max(0, Number(r.originalAmount || 0) - Number(r.paidAmount || 0)),
+    }))
   }
 
   async registerPayment(customerId: string, receivableId: string, dto: RegisterCustomerReceivablePaymentDto, req?: any) {
