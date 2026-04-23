@@ -79,6 +79,15 @@ async function ensureCustomerSchema(dataSource: DataSource) {
     `)
 
     await dataSource.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_customer_code ON customers(customer_code);`)
+
+    // Allow foreign customers to be stored without a Mexican postal code.
+    // National customers still must keep a 5-digit postal code.
+    await dataSource.query(`ALTER TABLE customers DROP CONSTRAINT IF EXISTS check_postal_code;`)
+    await dataSource.query(`ALTER TABLE customers
+      ADD CONSTRAINT check_postal_code CHECK (
+        customer_type = 'extranjero' OR postal_code ~ '^[0-9]{5}$'
+      );
+    `)
   } catch (err) {
     console.warn('Customer schema could not be fully initialized:', err?.message || err)
   }

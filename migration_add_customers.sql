@@ -49,15 +49,15 @@ CREATE TABLE IF NOT EXISTS customers (
     
     CONSTRAINT check_rfc_format CHECK (rfc ~ '^[A-Z0-9]{12,13}$'),
     CONSTRAINT check_phone_format CHECK (phone ~ '^\+?52?1?\d{10}$' OR phone ~ '^[0-9]{10}$'),
-    CONSTRAINT check_postal_code CHECK (postal_code ~ '^[0-9]{5}$')
+    CONSTRAINT check_postal_code CHECK (customer_type = 'extranjero' OR postal_code ~ '^[0-9]{5}$')
 );
 
 -- Create indexes
-CREATE INDEX idx_customers_rfc ON customers(rfc);
-CREATE INDEX idx_customers_email ON customers(email);
-CREATE INDEX idx_customers_name ON customers(name);
-CREATE INDEX idx_customers_active ON customers(active);
-CREATE INDEX idx_customers_created_at ON customers(created_at);
+CREATE INDEX IF NOT EXISTS idx_customers_rfc ON customers(rfc);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_customers_active ON customers(active);
+CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers(created_at);
 
 -- Create trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_customers_updated_at()

@@ -12,6 +12,11 @@ import { TraceabilityService } from "../traceability/traceability.service"
 
 @Injectable()
 export class CustomersService {
+  private cleanString(value?: string | null): string | undefined {
+    const trimmed = String(value ?? "").trim()
+    return trimmed.length > 0 ? trimmed : undefined
+  }
+
   private extractShipmentNumber(notes?: string | null, fallbackValue?: string | null, invoiceNumber?: string | null): string | null {
     const rawNotes = String(notes || "")
     const noteMatch = rawNotes.match(/embarque\s*[:#-]?\s*([A-Za-z0-9-]+)/i)
@@ -48,37 +53,37 @@ export class CustomersService {
    * Crear nuevo cliente
    */
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
+    // Normalizar primero para evitar falsos duplicados por espacios en blanco
+    const normalizedDto = this.normalizeCustomerData(createCustomerDto)
+
     // Verificar si el ID de cliente ya existe
     const existingCustomerCode = await this.customersRepository.findOne({
-      where: { customerCode: createCustomerDto.customerCode.toUpperCase() },
+      where: { customerCode: normalizedDto.customerCode },
     })
 
     if (existingCustomerCode) {
-      throw new ConflictException(`Ya existe un cliente con el ID de cliente: ${createCustomerDto.customerCode}`)
+      throw new ConflictException(`Ya existe un cliente con el ID de cliente: ${normalizedDto.customerCode}`)
     }
 
     // Verificar si el RFC ya existe, solo cuando se proporciona
-    if (createCustomerDto.rfc) {
+    if (normalizedDto.rfc) {
       const existingRFC = await this.customersRepository.findOne({
-        where: { rfc: createCustomerDto.rfc.toUpperCase() },
+        where: { rfc: normalizedDto.rfc },
       })
 
       if (existingRFC) {
-        throw new ConflictException(`Ya existe un cliente con el RFC: ${createCustomerDto.rfc}`)
+        throw new ConflictException(`Ya existe un cliente con el RFC: ${normalizedDto.rfc}`)
       }
     }
 
     // Verificar si el email ya existe
     const existingEmail = await this.customersRepository.findOne({
-      where: { email: createCustomerDto.email.toLowerCase() },
+      where: { email: normalizedDto.email },
     })
 
     if (existingEmail) {
-      throw new ConflictException(`Ya existe un cliente con el email: ${createCustomerDto.email}`)
+      throw new ConflictException(`Ya existe un cliente con el email: ${normalizedDto.email}`)
     }
-
-    // Normalizar datos
-    const normalizedDto = this.normalizeCustomerData(createCustomerDto)
 
     // Validar ubicación según el tipo de cliente
     this.validateLocationData(normalizedDto)
@@ -280,24 +285,31 @@ export class CustomersService {
 
     // Convertir ID de cliente a mayúsculas
     if (normalized.customerCode) {
-      normalized.customerCode = normalized.customerCode.toUpperCase()
+      normalized.customerCode = String(normalized.customerCode).trim().toUpperCase()
     }
 
     if (normalized.customerType) {
-      normalized.customerType = String(normalized.customerType).toLowerCase()
+      normalized.customerType = String(normalized.customerType).trim().toLowerCase()
     } else {
       normalized.customerType = "nacional"
     }
 
     // Convertir RFC a mayúsculas
     if (normalized.rfc) {
-      normalized.rfc = normalized.rfc.toUpperCase()
+      normalized.rfc = String(normalized.rfc).trim().toUpperCase()
+    } else if (normalized.rfc === "") {
+      normalized.rfc = undefined
     }
 
     if (normalized.customerType === "nacional") {
       normalized.country = "México"
     } else if (normalized.country) {
-      normalized.country = String(normalized.country).trim()
+      normalized.country = this.cleanString(normalized.country)
+    }
+
+    if (normalized.customerType === "extranjero") {
+      normalized.state = this.cleanString(normalized.state) || ""
+      normalized.postalCode = this.cleanString(normalized.postalCode) || ""
     }
 
     if (normalized.state) {
@@ -310,17 +322,33 @@ export class CustomersService {
 
     // Convertir email a minúsculas
     if (normalized.email) {
-      normalized.email = normalized.email.toLowerCase()
+      normalized.email = String(normalized.email).trim().toLowerCase()
     }
 
     // Limpiar teléfono (remover caracteres especiales pero mantener números)
     if (normalized.phone) {
-      normalized.phone = normalized.phone.replace(/[\s\-()]/g, "")
+      normalized.phone = String(normalized.phone).trim().replace(/[\s\-()]/g, "")
     }
 
     // Si no proporciona CLABE, asignar undefined (no guardar vacío)
     if (normalized.clabe === "") {
       normalized.clabe = undefined
+    }
+
+    normalized.businessType = this.cleanString(normalized.businessType)
+    normalized.neighborhood = this.cleanString(normalized.neighborhood)
+    normalized.contactName = this.cleanString(normalized.contactName)
+    normalized.bankName = this.cleanString(normalized.bankName)
+    normalized.accountNumber = this.cleanString(normalized.accountNumber)
+    normalized.notes = this.cleanString(normalized.notes)
+
+    if (normalized.clabe) {
+      normalized.clabe = String(normalized.clabe).trim()
+    }
+
+    if (typeof normalized.creditDays === "string") {
+      const parsed = Number.parseInt(normalized.creditDays, 10)
+      normalized.creditDays = Number.isFinite(parsed) ? parsed : undefined
     }
 
     return normalized
