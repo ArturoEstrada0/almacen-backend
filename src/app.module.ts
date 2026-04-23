@@ -36,11 +36,17 @@ import { AccountingModule } from "./modules/accounting/accounting.module"
         const isProd = config.get('NODE_ENV') === 'production'
 
         if (databaseUrl) {
+          const poolMax = Number(config.get('DB_POOL_MAX') || 2)
           return {
             type: 'postgres',
             url: databaseUrl,
             // For managed Postgres (Supabase) allow SSL and skip certificate validation
             ssl: isProd || config.get('DB_FORCE_SSL') ? { rejectUnauthorized: false } : false,
+            extra: {
+              max: poolMax,
+              idleTimeoutMillis: 30000,
+              connectionTimeoutMillis: 10000,
+            },
             autoLoadEntities: true,
             synchronize: !isProd,
             logging: !isProd,
@@ -54,6 +60,11 @@ import { AccountingModule } from "./modules/accounting/accounting.module"
           username: config.get('DB_USERNAME', 'postgres'),
           password: config.get('DB_PASSWORD', 'postgres'),
           database: config.get('DB_DATABASE', 'almacen'),
+          extra: {
+            max: Number(config.get('DB_POOL_MAX') || 2),
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 10000,
+          },
           autoLoadEntities: true,
           synchronize: !isProd,
           logging: !isProd,

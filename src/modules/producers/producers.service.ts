@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import type { Repository } from "typeorm"
+import type { EntityManager, Repository } from "typeorm"
 import { DataSource, In } from "typeorm"
 import { Producer } from "./entities/producer.entity"
 import { Customer } from "../customers/entities/customer.entity"
@@ -13,6 +13,7 @@ import { InputReturn } from "./entities/input-return.entity"
 import { InputReturnItem } from "./entities/input-return-item.entity"
 import { Shipment } from "./entities/shipment.entity"
 import { ProducerAccountMovement } from "./entities/producer-account-movement.entity"
+import { InventoryItem } from "../inventory/entities/inventory-item.entity"
 import { CustomerReceivableInvoice } from "../customers/entities/customer-receivable.entity"
 import { PaymentReport } from "./entities/payment-report.entity"
 import { PaymentReportItem } from "./entities/payment-report-item.entity"
@@ -108,6 +109,55 @@ export class ProducersService {
 
   private generateCode(prefix: string) {
     return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 9000) + 1000}`
+  }
+
+  private async reconcileShipmentInventory(manager: EntityManager, receptions: FruitReception[]): Promise<void> {
+    const combos = [...new Map(receptions.map((reception) => [`${reception.warehouseId}:${reception.productId}`, reception]))].map(([, reception]) => ({
+      warehouseId: reception.warehouseId,
+      productId: reception.productId,
+    }))
+
+    if (combos.length === 0) return
+
+    const warehouseIds = [...new Set(combos.map((combo) => combo.warehouseId))]
+    const productIds = [...new Set(combos.map((combo) => combo.productId))]
+
+    const pendingReceptions = await manager.find(FruitReception, {
+      where: {
+        shipmentStatus: "pendiente" as any,
+        warehouseId: In(warehouseIds),
+        productId: In(productIds),
+      },
+    })
+
+    const pendingTotals = new Map<string, number>()
+    for (const reception of pendingReceptions) {
+      const key = `${reception.warehouseId}:${reception.productId}`
+      pendingTotals.set(key, (pendingTotals.get(key) || 0) + Number(reception.boxes || 0))
+    }
+
+    for (const combo of combos) {
+      const key = `${combo.warehouseId}:${combo.productId}`
+      const expectedQuantity = pendingTotals.get(key) || 0
+
+      let inventoryItem = await manager.findOne(InventoryItem, {
+        where: { warehouseId: combo.warehouseId, productId: combo.productId },
+      })
+
+      if (!inventoryItem) {
+        inventoryItem = manager.create(InventoryItem, {
+          warehouseId: combo.warehouseId,
+          productId: combo.productId,
+          quantity: 0,
+          minStock: 0,
+          maxStock: 0,
+          reorderPoint: 0,
+        })
+      }
+
+      inventoryItem.quantity = expectedQuantity
+      await manager.save(inventoryItem)
+    }
   }
 
   private async generateTrackingFolio(): Promise<string> {
@@ -877,16 +927,19 @@ export class ProducersService {
       })
       await queryRunner.manager.save(shipment)
 
+      // Reconciliar el inventario con las recepciones pendientes antes de marcar el embarque.
+      // Esto evita errores de stock insuficiente cuando el inventario quedó desfasado por cambios previos.
+      await this.reconcileShipmentInventory(queryRunner.manager, receptions)
+
       for (const reception of receptions) {
         reception.shipmentId = shipment.id
         reception.shipmentStatus = "embarcada"
         await queryRunner.manager.save(reception)
       }
 
-      // Crear movimiento de salida del almacén de frutas - Descuenta el stock cuando se embarcan
-      // Agrupamos por producto y warehouseId para crear un movimiento por cada combinación
+      // Descontar el stock de las recepciones embarcadas directamente dentro de la misma transacción.
       const movementsByWarehouse = new Map<string, Map<string, number>>()
-      
+
       for (const reception of receptions) {
         const warehouseId = reception.warehouseId
         const productId = reception.productId
@@ -901,20 +954,20 @@ export class ProducersService {
         warehouseProducts.set(productId, currentQty + boxes)
       }
 
-      // Crear un movimiento de salida por cada almacén
+      // Aplicar el descuento por cada almacén/producto embarcado
       for (const [warehouseId, products] of movementsByWarehouse) {
-        const items = Array.from(products.entries()).map(([productId, quantity]) => ({
-          productId,
-          quantity,
-        }))
+        for (const [productId, quantity] of products) {
+          const inventoryItem = await queryRunner.manager.findOne(InventoryItem, {
+            where: { warehouseId, productId },
+          })
 
-        await this.inventoryService.createMovement({
-          type: MovementType.SALIDA,
-          warehouseId,
-          reference: `Embarque ${shipment.code}`,
-          notes: `Salida de ${totalBoxes} cajas por embarque`,
-          items,
-        })
+          if (!inventoryItem || Number(inventoryItem.quantity) < Number(quantity)) {
+            throw new BadRequestException(`Insufficient stock for product ${productId} in warehouse ${warehouseId}`)
+          }
+
+          inventoryItem.quantity = Number(inventoryItem.quantity) - Number(quantity)
+          await queryRunner.manager.save(inventoryItem)
+        }
       }
 
       const accountingEntries = await this.syncShipmentAccountingEntries(queryRunner.manager, shipment, dto)
