@@ -7,7 +7,7 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger"
 import { DataSource } from "typeorm"
 import { AppModule } from "./app.module"
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter"
-
+// main
 async function ensureShipmentSchema(dataSource: DataSource) {
   // These columns are required for existing queries (e.g. fruit receptions -> shipment relation).
   await dataSource.query(`ALTER TABLE shipments
