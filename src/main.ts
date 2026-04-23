@@ -63,6 +63,27 @@ async function ensureShipmentSchema(dataSource: DataSource) {
   }
 }
 
+async function ensureCustomerSchema(dataSource: DataSource) {
+  try {
+    await dataSource.query(`ALTER TABLE customers
+      ADD COLUMN IF NOT EXISTS customer_code VARCHAR(100);
+    `)
+
+    await dataSource.query(`ALTER TABLE customers
+      ADD COLUMN IF NOT EXISTS customer_type VARCHAR(20) NOT NULL DEFAULT 'nacional',
+      ADD COLUMN IF NOT EXISTS country VARCHAR(100) NOT NULL DEFAULT 'México';
+    `)
+
+    await dataSource.query(`ALTER TABLE customers
+      ALTER COLUMN rfc DROP NOT NULL;
+    `)
+
+    await dataSource.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_customer_code ON customers(customer_code);`)
+  } catch (err) {
+    console.warn('Customer schema could not be fully initialized:', err?.message || err)
+  }
+}
+
 async function ensureCustomerReceivablesSchema(dataSource: DataSource) {
   try {
     await dataSource.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
@@ -178,6 +199,12 @@ async function bootstrap() {
     await ensureCustomerReceivablesSchema(app.get(DataSource))
   } catch (err) {
     console.warn('Could not ensure customer receivables schema:', err?.message || err)
+  }
+
+  try {
+    await ensureCustomerSchema(app.get(DataSource))
+  } catch (err) {
+    console.warn('Could not ensure customer schema:', err?.message || err)
   }
 
   // Serve uploaded files under /uploads

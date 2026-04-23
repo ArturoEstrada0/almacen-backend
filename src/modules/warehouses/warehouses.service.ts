@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import type { Repository } from "typeorm"
+import type { DeepPartial, Repository } from "typeorm"
 import { Warehouse } from "./entities/warehouse.entity"
 import { Location } from "./entities/location.entity"
 import type { CreateWarehouseDto } from "./dto/create-warehouse.dto"
@@ -23,8 +23,22 @@ export class WarehousesService {
   }
 
   async create(createWarehouseDto: CreateWarehouseDto): Promise<Warehouse> {
-    const warehouse = this.warehousesRepository.create(createWarehouseDto)
-    return await this.warehousesRepository.save(warehouse)
+    const normalizedType = (createWarehouseDto.type || (createWarehouseDto as any).warehouseType || "insumo") as Warehouse["type"]
+    const payload: DeepPartial<Warehouse> = {
+      ...createWarehouseDto,
+      type: normalizedType,
+      active:
+        createWarehouseDto.active !== undefined
+          ? createWarehouseDto.active
+          : createWarehouseDto.isActive !== undefined
+            ? createWarehouseDto.isActive
+            : true,
+    }
+    delete (payload as any).isActive
+    delete (payload as any).warehouseType
+
+    const warehouse = this.warehousesRepository.create(payload as DeepPartial<Warehouse>)
+    return await this.warehousesRepository.save(warehouse as Warehouse)
   }
 
   async findAll(): Promise<Warehouse[]> {
@@ -61,7 +75,22 @@ export class WarehousesService {
 
   async update(id: string, updateWarehouseDto: UpdateWarehouseDto): Promise<Warehouse> {
     const warehouse = await this.findOne(id)
-    Object.assign(warehouse, updateWarehouseDto)
+
+    const normalizedType =
+      (updateWarehouseDto as any).type || (updateWarehouseDto as any).warehouseType || warehouse.type || "insumo"
+
+    const payload: any = {
+      ...updateWarehouseDto,
+      type: normalizedType,
+      active:
+        (updateWarehouseDto as any).active !== undefined
+          ? (updateWarehouseDto as any).active
+          : (updateWarehouseDto as any).isActive,
+    }
+    delete payload.isActive
+    delete payload.warehouseType
+
+    Object.assign(warehouse, payload)
     return await this.warehousesRepository.save(warehouse)
   }
 

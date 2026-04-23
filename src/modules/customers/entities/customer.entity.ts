@@ -7,7 +7,13 @@ export enum PaymentMethod {
   CREDIT = "credit",
 }
 
+export enum CustomerType {
+  NATIONAL = "nacional",
+  FOREIGN = "extranjero",
+}
+
 @Entity("customers")
+@Index(["customerCode"], { unique: true })
 @Index(["rfc"], { unique: true })
 @Index(["email"])
 @Index(["name"])
@@ -16,8 +22,14 @@ export class Customer {
   id: string
 
   // Identificación
-  @Column({ unique: true })
-  rfc: string
+  @Column({ name: "customer_code", unique: true, nullable: true })
+  customerCode: string
+
+  @Column({ unique: true, nullable: true })
+  rfc?: string
+
+  @Column({ name: "customer_type", type: "varchar", length: 20, default: CustomerType.NATIONAL })
+  customerType: CustomerType
 
   @Column()
   name: string
@@ -38,10 +50,13 @@ export class Customer {
   @Column()
   city: string
 
-  @Column()
+  @Column({ nullable: true })
   state: string
 
-  @Column({ name: "postal_code" })
+  @Column({ name: "country", default: "México" })
+  country: string
+
+  @Column({ name: "postal_code", nullable: true })
   postalCode: string
 
   @Column({ name: "full_address", type: "text", nullable: true })

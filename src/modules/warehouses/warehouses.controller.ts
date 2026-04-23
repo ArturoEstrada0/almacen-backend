@@ -35,7 +35,7 @@ export class WarehousesController {
   @Patch(":id")
   @ApiOperation({ summary: "Update a warehouse" })
   @ApiResponse({ status: 200, description: "Warehouse updated successfully" })
-  update(@Param('id', ParseUUIDPipe) id: string, updateWarehouseDto: UpdateWarehouseDto) {
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateWarehouseDto: UpdateWarehouseDto) {
     return this.warehousesService.update(id, updateWarehouseDto)
   }
 
@@ -49,7 +49,7 @@ export class WarehousesController {
   @Post("locations")
   @ApiOperation({ summary: "Create a new location" })
   @ApiResponse({ status: 201, description: "Location created successfully" })
-  createLocation(createLocationDto: CreateLocationDto) {
+  createLocation(@Body() createLocationDto: CreateLocationDto) {
     return this.warehousesService.createLocation(createLocationDto)
   }
 

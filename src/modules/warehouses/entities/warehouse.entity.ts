@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Location } from "./location.entity"
 import { InventoryItem } from "../../inventory/entities/inventory-item.entity"
 
+export type WarehouseType = "insumo" | "fruta"
+
 @Entity("warehouses")
 export class Warehouse {
   @PrimaryGeneratedColumn("uuid")
@@ -13,8 +15,14 @@ export class Warehouse {
   @Column()
   code: string
 
+  @Column({ type: "enum", enum: ["insumo", "fruta"], default: "insumo" })
+  type: WarehouseType
+
   @Column({ type: "text", nullable: true })
   address: string
+
+  @Column({ type: "text", nullable: true })
+  description: string
 
   @Column({ nullable: true })
   city: string

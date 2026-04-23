@@ -1,5 +1,8 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsBoolean } from "class-validator"
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsBoolean, IsIn } from "class-validator"
+
+export const SUPPLIER_TYPES = ["insumos", "fruta", "servicios", "transporte", "empaque"] as const
+export type SupplierType = (typeof SUPPLIER_TYPES)[number]
 
 export class CreateSupplierDto {
   @ApiProperty({ example: "SUP-001" })
@@ -42,6 +45,12 @@ export class CreateSupplierDto {
   @IsOptional()
   businessType?: string
 
+  @ApiProperty({ example: "insumos", enum: SUPPLIER_TYPES })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(SUPPLIER_TYPES)
+  supplierType: SupplierType
+
   @ApiProperty({ example: 30, required: false })
   @IsOptional()
   creditDays?: number
@@ -51,7 +60,6 @@ export class CreateSupplierDto {
   @IsOptional()
   isActive?: boolean
 
-  // Cuenta bancaria en Pesos (MXN)
   @ApiProperty({ example: "BBVA Bancomer", required: false })
   @IsString()
   @IsOptional()
@@ -67,7 +75,6 @@ export class CreateSupplierDto {
   @IsOptional()
   clabeMxn?: string
 
-  // Cuenta bancaria en Dólares (USD)
   @ApiProperty({ example: "Bank of America", required: false })
   @IsString()
   @IsOptional()
@@ -82,4 +89,5 @@ export class CreateSupplierDto {
   @IsString()
   @IsOptional()
   swiftCodeUsd?: string
+
 }

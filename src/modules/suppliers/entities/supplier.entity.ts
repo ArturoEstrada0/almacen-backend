@@ -39,6 +39,9 @@ export class Supplier {
   @Column({ name: "business_type", nullable: true })
   businessType: string
 
+  @Column({ name: "supplier_type", default: "insumos" })
+  supplierType: string
+
   @Column({ name: "payment_terms", default: 0 })
   paymentTerms: number
 

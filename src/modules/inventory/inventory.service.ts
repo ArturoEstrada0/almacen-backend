@@ -6,6 +6,7 @@ import { InventoryItem } from "./entities/inventory-item.entity"
 import { Movement } from "./entities/movement.entity"
 import { MovementItem } from "./entities/movement-item.entity"
 import { Warehouse } from "../warehouses/entities/warehouse.entity"
+import { Product } from "../products/entities/product.entity"
 import { type CreateMovementDto, MovementType } from "./dto/create-movement.dto"
 
 @Injectable()
@@ -19,6 +20,8 @@ export class InventoryService {
     private movementsRepository: Repository<Movement>,
     @InjectRepository(MovementItem)
     private movementItemsRepository: Repository<MovementItem>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
     private dataSource: DataSource,
   ) {}
 
@@ -53,6 +56,38 @@ export class InventoryService {
   }
 
   async createMovement(createMovementDto: CreateMovementDto): Promise<Movement> {
+    const sourceWarehouse = await this.warehouseRepository.findOne({ where: { id: createMovementDto.warehouseId } })
+    if (!sourceWarehouse) {
+      throw new BadRequestException(`Warehouse ${createMovementDto.warehouseId} not found`)
+    }
+
+    const destinationWarehouse = createMovementDto.destinationWarehouseId
+      ? await this.warehouseRepository.findOne({ where: { id: createMovementDto.destinationWarehouseId } })
+      : null
+
+    if (createMovementDto.destinationWarehouseId && !destinationWarehouse) {
+      throw new BadRequestException(`Destination warehouse ${createMovementDto.destinationWarehouseId} not found`)
+    }
+
+    for (const itemDto of createMovementDto.items) {
+      const product = await this.productRepository.findOne({ where: { id: itemDto.productId } })
+      if (!product) {
+        throw new BadRequestException(`Product ${itemDto.productId} not found`)
+      }
+
+      if (sourceWarehouse.type !== product.type) {
+        throw new BadRequestException(
+          `Product ${product.name} (${product.type}) is not allowed in warehouse ${sourceWarehouse.name} (${sourceWarehouse.type})`,
+        )
+      }
+
+      if (destinationWarehouse && destinationWarehouse.type !== product.type) {
+        throw new BadRequestException(
+          `Product ${product.name} (${product.type}) is not allowed in destination warehouse ${destinationWarehouse.name} (${destinationWarehouse.type})`,
+        )
+      }
+    }
+
     // Basic validations for transfers
     if (createMovementDto.type === MovementType.TRASPASO) {
       if (!createMovementDto.destinationWarehouseId) {
@@ -73,6 +108,10 @@ export class InventoryService {
 
       if (!src.active) throw new BadRequestException(`Source warehouse ${createMovementDto.warehouseId} is not active`)
       if (!dest.active) throw new BadRequestException(`Destination warehouse ${createMovementDto.destinationWarehouseId} is not active`)
+
+      if (src.type !== dest.type) {
+        throw new BadRequestException("Source and destination warehouse types must match for traspaso")
+      }
 
       // Pre-check stock for each item to provide early feedback (avoids creating a movement that will rollback)
       for (const itemDto of createMovementDto.items) {
@@ -262,6 +301,25 @@ export class InventoryService {
     expirationDate?: Date | string
   }) {
     const { warehouseId, quantity, minStock, maxStock, reorderPoint, locationId, lotNumber, expirationDate } = body
+
+    const [warehouse, product] = await Promise.all([
+      this.warehouseRepository.findOne({ where: { id: warehouseId } }),
+      this.productRepository.findOne({ where: { id: productId } }),
+    ])
+
+    if (!warehouse) {
+      throw new BadRequestException(`Warehouse ${warehouseId} not found`)
+    }
+
+    if (!product) {
+      throw new BadRequestException(`Product ${productId} not found`)
+    }
+
+    if (warehouse.type !== product.type) {
+      throw new BadRequestException(
+        `Product ${product.name} (${product.type}) is not allowed in warehouse ${warehouse.name} (${warehouse.type})`,
+      )
+    }
 
     const where: any = { productId }
     if (warehouseId) where.warehouseId = warehouseId

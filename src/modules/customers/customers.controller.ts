@@ -114,7 +114,7 @@ export class CustomersController {
   @ApiOperation({ summary: "Crear nuevo cliente" })
   @ApiResponse({ status: 201, description: "Cliente creado exitosamente", type: Customer })
   @ApiResponse({ status: 400, description: "Datos inválidos" })
-  @ApiResponse({ status: 409, description: "RFC o email duplicado" })
+  @ApiResponse({ status: 409, description: "ID de cliente, RFC o email duplicado" })
   @ApiResponse({ status: 403, description: "No tiene permisos de administrador" })
   async create(@Body() createCustomerDto: CreateCustomerDto): Promise<Customer> {
     return this.customersService.create(createCustomerDto)
@@ -152,7 +152,7 @@ export class CustomersController {
    */
   @Get("search")
   @Roles("admin")
-  @ApiOperation({ summary: "Buscar clientes por nombre, RFC o email" })
+  @ApiOperation({ summary: "Buscar clientes por nombre, ID de cliente, RFC o email" })
   @ApiResponse({ status: 200, description: "Clientes encontrados", type: [Customer] })
   @ApiResponse({ status: 403, description: "No tiene permisos de administrador" })
   async search(@Query("q") query: string): Promise<Customer[]> {
@@ -275,7 +275,7 @@ export class CustomersController {
   @ApiResponse({ status: 200, description: "Cliente actualizado", type: Customer })
   @ApiResponse({ status: 400, description: "Datos inválidos" })
   @ApiResponse({ status: 404, description: "Cliente no encontrado" })
-  @ApiResponse({ status: 409, description: "RFC o email duplicado" })
+  @ApiResponse({ status: 409, description: "ID de cliente, RFC o email duplicado" })
   @ApiResponse({ status: 403, description: "No tiene permisos de administrador" })
   async update(
     @Param("id", ParseUUIDPipe) id: string,

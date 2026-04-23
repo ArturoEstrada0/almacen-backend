@@ -48,13 +48,24 @@ export class CustomersService {
    * Crear nuevo cliente
    */
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
-    // Verificar si el RFC ya existe
-    const existingRFC = await this.customersRepository.findOne({
-      where: { rfc: createCustomerDto.rfc.toUpperCase() },
+    // Verificar si el ID de cliente ya existe
+    const existingCustomerCode = await this.customersRepository.findOne({
+      where: { customerCode: createCustomerDto.customerCode.toUpperCase() },
     })
 
-    if (existingRFC) {
-      throw new ConflictException(`Ya existe un cliente con el RFC: ${createCustomerDto.rfc}`)
+    if (existingCustomerCode) {
+      throw new ConflictException(`Ya existe un cliente con el ID de cliente: ${createCustomerDto.customerCode}`)
+    }
+
+    // Verificar si el RFC ya existe, solo cuando se proporciona
+    if (createCustomerDto.rfc) {
+      const existingRFC = await this.customersRepository.findOne({
+        where: { rfc: createCustomerDto.rfc.toUpperCase() },
+      })
+
+      if (existingRFC) {
+        throw new ConflictException(`Ya existe un cliente con el RFC: ${createCustomerDto.rfc}`)
+      }
     }
 
     // Verificar si el email ya existe
@@ -68,6 +79,9 @@ export class CustomersService {
 
     // Normalizar datos
     const normalizedDto = this.normalizeCustomerData(createCustomerDto)
+
+    // Validar ubicación según el tipo de cliente
+    this.validateLocationData(normalizedDto)
 
     // Validar lógica de negocio
     this.validatePaymentData(normalizedDto)
@@ -156,6 +170,7 @@ export class CustomersService {
     return await this.customersRepository.find({
       where: [
         { name: ILike(`%${searchTerm}%`) },
+        { customerCode: ILike(`%${searchTerm}%`) },
         { rfc: ILike(`%${searchTerm}%`) },
         { email: ILike(`%${searchTerm}%`) },
         { contactName: ILike(`%${searchTerm}%`) },
@@ -169,6 +184,19 @@ export class CustomersService {
    */
   async update(id: string, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
     const customer = await this.findOne(id)
+
+    // Si cambió el ID de cliente, verificar que no exista otro con ese valor
+    if (
+      updateCustomerDto.customerCode &&
+      updateCustomerDto.customerCode.toUpperCase() !== customer.customerCode?.toUpperCase()
+    ) {
+      const existingCustomerCode = await this.customersRepository.findOne({
+        where: { customerCode: updateCustomerDto.customerCode.toUpperCase() },
+      })
+      if (existingCustomerCode) {
+        throw new ConflictException(`Ya existe otro cliente con el ID de cliente: ${updateCustomerDto.customerCode}`)
+      }
+    }
 
     // Si cambió el RFC, verificar que no exista otro con ese RFC
     if (updateCustomerDto.rfc && updateCustomerDto.rfc.toUpperCase() !== customer.rfc) {
@@ -192,6 +220,9 @@ export class CustomersService {
 
     // Normalizar datos
     const normalizedDto = this.normalizeCustomerData(updateCustomerDto)
+
+    // Validar ubicación según el tipo de cliente
+    this.validateLocationData({ ...customer, ...normalizedDto })
 
     // Validar lógica de negocio
     this.validatePaymentData({ ...customer, ...normalizedDto })
@@ -247,9 +278,34 @@ export class CustomersService {
   private normalizeCustomerData(dto: CreateCustomerDto | UpdateCustomerDto): any {
     const normalized: any = { ...dto }
 
+    // Convertir ID de cliente a mayúsculas
+    if (normalized.customerCode) {
+      normalized.customerCode = normalized.customerCode.toUpperCase()
+    }
+
+    if (normalized.customerType) {
+      normalized.customerType = String(normalized.customerType).toLowerCase()
+    } else {
+      normalized.customerType = "nacional"
+    }
+
     // Convertir RFC a mayúsculas
     if (normalized.rfc) {
       normalized.rfc = normalized.rfc.toUpperCase()
+    }
+
+    if (normalized.customerType === "nacional") {
+      normalized.country = "México"
+    } else if (normalized.country) {
+      normalized.country = String(normalized.country).trim()
+    }
+
+    if (normalized.state) {
+      normalized.state = String(normalized.state).trim()
+    }
+
+    if (normalized.postalCode) {
+      normalized.postalCode = String(normalized.postalCode).trim()
     }
 
     // Convertir email a minúsculas
@@ -290,6 +346,30 @@ export class CustomersService {
   }
 
   /**
+   * Validar datos de ubicación según el tipo de cliente
+   */
+  private validateLocationData(customer: any): void {
+    const customerType = String(customer.customerType || "nacional").toLowerCase()
+
+    if (customerType === "nacional") {
+      if (!customer.state || !String(customer.state).trim()) {
+        throw new BadRequestException("Para clientes nacionales, el estado es obligatorio")
+      }
+      if (!customer.postalCode || !String(customer.postalCode).trim()) {
+        throw new BadRequestException("Para clientes nacionales, el código postal es obligatorio")
+      }
+      return
+    }
+
+    if (!customer.country || !String(customer.country).trim()) {
+      throw new BadRequestException("Para clientes extranjeros, el país es obligatorio")
+    }
+    if (!customer.city || !String(customer.city).trim()) {
+      throw new BadRequestException("Para clientes extranjeros, la ciudad es obligatoria")
+    }
+  }
+
+  /**
    * Construir dirección completa a partir de componentes
    */
   private buildFullAddress(data: any): string {
@@ -299,8 +379,13 @@ export class CustomersService {
     if (data.streetNumber) parts.push(data.streetNumber)
     if (data.neighborhood) parts.push(data.neighborhood)
     if (data.city) parts.push(data.city)
-    if (data.state) parts.push(data.state)
-    if (data.postalCode) parts.push(data.postalCode)
+    if (data.customerType === "nacional") {
+      if (data.state) parts.push(data.state)
+      if (data.postalCode) parts.push(data.postalCode)
+      parts.push("México")
+    } else {
+      if (data.country) parts.push(data.country)
+    }
 
     return parts.filter(Boolean).join(", ")
   }

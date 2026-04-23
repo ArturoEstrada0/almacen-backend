@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm'
 import type { Request } from 'express'
 import { Supplier } from "./entities/supplier.entity"
 import type { CreateSupplierDto } from "./dto/create-supplier.dto"
+import { SUPPLIER_TYPES } from "./dto/create-supplier.dto"
 import { TraceabilityService } from "../traceability/traceability.service"
 import type { UpdateSupplierDto } from "./dto/update-supplier.dto"
 
@@ -22,6 +23,10 @@ export class SuppliersService {
   }
 
   async create(createSupplierDto: CreateSupplierDto): Promise<Supplier> {
+    if (!createSupplierDto.supplierType || !SUPPLIER_TYPES.includes(createSupplierDto.supplierType)) {
+      throw new BadRequestException("El tipo de proveedor es obligatorio y debe ser válido")
+    }
+
     // Map DTO fields to entity fields where names differ
     const payload: any = { ...createSupplierDto } as any
     if ((createSupplierDto as any).taxId) {
@@ -43,14 +48,20 @@ export class SuppliersService {
     return await this.suppliersRepository.save(supplier)
   }
 
-  async findAll(): Promise<Supplier[]> {
+  async findAll(supplierType?: string): Promise<Supplier[]> {
     // Avoid loading nested relations here to prevent TypeORM from trying to resolve
     // any relation names that may not exist on the entity (see EntityPropertyNotFoundError).
     // The API currently expects a flat supplier list; productSuppliers can be loaded
     // separately when needed.
-    return await this.suppliersRepository.find({
-      order: { name: "ASC" },
-    })
+    const query = this.suppliersRepository
+      .createQueryBuilder("supplier")
+      .orderBy("supplier.name", "ASC")
+
+    if (supplierType) {
+      query.where("supplier.supplierType = :supplierType", { supplierType })
+    }
+
+    return await query.getMany()
   }
 
   async findOne(id: string): Promise<Supplier> {
@@ -83,7 +94,16 @@ export class SuppliersService {
       delete payload.isActive
     }
 
+    if (payload.supplierType !== undefined && (!payload.supplierType || !SUPPLIER_TYPES.includes(payload.supplierType))) {
+      throw new BadRequestException("El tipo de proveedor es obligatorio y debe ser válido")
+    }
+
     Object.assign(supplier, payload)
+
+    if (!supplier.supplierType || !SUPPLIER_TYPES.includes(supplier.supplierType as any)) {
+      throw new BadRequestException("No se puede guardar un proveedor sin tipo asignado")
+    }
+
     return await this.suppliersRepository.save(supplier)
   }
 

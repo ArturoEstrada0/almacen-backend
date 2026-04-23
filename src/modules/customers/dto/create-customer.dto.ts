@@ -1,14 +1,30 @@
-import { IsString, IsNotEmpty, IsEmail, IsOptional, IsEnum, IsInt, Min, IsPhoneNumber, ValidateIf } from "class-validator"
+import { Transform } from "class-transformer"
+import { IsString, IsNotEmpty, IsEmail, IsOptional, IsEnum, IsInt, Min, ValidateIf, IsIn } from "class-validator"
 import { ApiProperty } from "@nestjs/swagger"
 import { IsValidRFC, IsValidMexicoPhone, IsValidCLABE } from "../validators/custom-validators"
-import { PaymentMethod } from "../entities/customer.entity"
+import { PaymentMethod, CustomerType } from "../entities/customer.entity"
+
+export const CUSTOMER_TYPES = [CustomerType.NATIONAL, CustomerType.FOREIGN] as const
 
 export class CreateCustomerDto {
-  @ApiProperty({ example: "ABC123456XYZ", description: "RFC del cliente (formato mexicano válido)" })
+  @ApiProperty({ example: "CLI-0001", description: "ID de cliente" })
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim().toUpperCase() : value))
+  customerCode: string
+
+  @ApiProperty({ enum: CUSTOMER_TYPES, default: CustomerType.NATIONAL, description: "Tipo de cliente" })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(CUSTOMER_TYPES)
+  customerType: CustomerType
+
+  @ApiProperty({ example: "ABC123456XYZ", required: false, description: "RFC del cliente (formato mexicano válido)" })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim().toUpperCase() || undefined : value))
   @IsValidRFC()
-  rfc: string
+  rfc?: string
 
   @ApiProperty({ example: "ABC Soluciones S.A. de C.V.", description: "Nombre o Razón Social" })
   @IsString()
@@ -41,13 +57,21 @@ export class CreateCustomerDto {
   @IsNotEmpty()
   city: string
 
-  @ApiProperty({ example: "CDMX", description: "Estado" })
+  @ApiProperty({ example: "CDMX", required: false, description: "Estado (obligatorio para clientes nacionales)" })
   @IsString()
+  @ValidateIf((obj) => obj.customerType === CustomerType.NATIONAL)
   @IsNotEmpty()
   state: string
 
-  @ApiProperty({ example: "06500", description: "Código Postal" })
+  @ApiProperty({ example: "México", required: false, description: "País (obligatorio para clientes extranjeros)" })
   @IsString()
+  @ValidateIf((obj) => obj.customerType === CustomerType.FOREIGN)
+  @IsNotEmpty()
+  country?: string
+
+  @ApiProperty({ example: "06500", required: false, description: "Código Postal (obligatorio para clientes nacionales)" })
+  @IsString()
+  @ValidateIf((obj) => obj.customerType === CustomerType.NATIONAL)
   @IsNotEmpty()
   postalCode: string
 

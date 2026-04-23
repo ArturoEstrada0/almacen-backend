@@ -6,9 +6,10 @@ import { InventoryItem } from "./entities/inventory-item.entity"
 import { Movement } from "./entities/movement.entity"
 import { MovementItem } from "./entities/movement-item.entity"
 import { Warehouse } from "../warehouses/entities/warehouse.entity"
+import { Product } from "../products/entities/product.entity"
 
 @Module({
-  imports: [TypeOrmModule.forFeature([InventoryItem, Movement, MovementItem, Warehouse])],
+  imports: [TypeOrmModule.forFeature([InventoryItem, Movement, MovementItem, Warehouse, Product])],
   controllers: [InventoryController],
   providers: [InventoryService],
   exports: [InventoryService],

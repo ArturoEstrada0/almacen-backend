@@ -1,5 +1,11 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from "class-validator"
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger"
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsEnum } from "class-validator"
+import type { WarehouseType } from "../entities/warehouse.entity"
+
+enum WarehouseTypeEnum {
+  INSUMO = "insumo",
+  FRUTA = "fruta",
+}
 
 export class CreateWarehouseDto {
   @ApiProperty({ example: "Almacén Central" })
@@ -11,6 +17,16 @@ export class CreateWarehouseDto {
   @IsString()
   @IsNotEmpty()
   code: string
+
+  @ApiProperty({ enum: WarehouseTypeEnum, default: WarehouseTypeEnum.INSUMO })
+  @IsEnum(WarehouseTypeEnum)
+  @IsOptional()
+  type?: WarehouseType
+
+  @ApiPropertyOptional({ enum: WarehouseTypeEnum, description: "Legacy alias for type" })
+  @IsEnum(WarehouseTypeEnum)
+  @IsOptional()
+  warehouseType?: WarehouseType
 
   @ApiProperty({ example: "Av. Principal 123", required: false })
   @IsString()
@@ -26,4 +42,9 @@ export class CreateWarehouseDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean
+
+  @ApiProperty({ example: true, default: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  active?: boolean
 }

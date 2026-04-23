@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsNotEmpty, IsUUID, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsDateString } from "class-validator"
+import { IsString, IsNotEmpty, IsUUID, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsDateString, IsInt } from "class-validator"
 import { Type } from "class-transformer"
 
 export class InputReturnItemDto {
@@ -9,7 +9,7 @@ export class InputReturnItemDto {
   productId: string
 
   @ApiProperty({ example: 10 })
-  @IsNumber()
+  @IsInt()
   @Min(1)
   quantity: number
 
