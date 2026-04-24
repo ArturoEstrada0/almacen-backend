@@ -8,6 +8,7 @@ import {
 } from "./entities/product-catalog-item.entity"
 import { CreateProductCatalogItemDto } from "./dto/create-product-catalog-item.dto"
 import { UpdateProductCatalogItemDto } from "./dto/update-product-catalog-item.dto"
+import { Category } from "../categories/entities/category.entity"
 
 export interface ProductCatalogFilters {
   type?: ProductCatalogItemType
@@ -20,6 +21,8 @@ export class ProductCatalogService {
   constructor(
     @InjectRepository(ProductCatalogItem)
     private readonly catalogRepository: Repository<ProductCatalogItem>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
   ) {}
 
   async findAll(filters?: ProductCatalogFilters): Promise<ProductCatalogItem[]> {
@@ -67,12 +70,19 @@ export class ProductCatalogService {
       type,
       status: dto.status || "active",
     })
+    const saved = await this.catalogRepository.save(item)
 
-    return this.catalogRepository.save(item)
+    if (saved.type === "category") {
+      await this.syncCategoryByName(saved.name)
+    }
+
+    return saved
   }
 
   async update(id: string, dto: UpdateProductCatalogItemDto): Promise<ProductCatalogItem> {
     const item = await this.findOne(id)
+    const previousName = item.name
+    const previousType = item.type
     const nextName = dto.name !== undefined ? dto.name.trim() : item.name
     const nextType = dto.type !== undefined ? dto.type : item.type
 
@@ -85,7 +95,13 @@ export class ProductCatalogService {
     if (dto.type !== undefined) item.type = dto.type
     if (dto.status !== undefined) item.status = dto.status
 
-    return this.catalogRepository.save(item)
+    const saved = await this.catalogRepository.save(item)
+
+    if (saved.type === "category") {
+      await this.syncCategoryRename(previousType === "category" ? previousName : undefined, saved.name)
+    }
+
+    return saved
   }
 
   async remove(id: string): Promise<void> {
@@ -107,5 +123,36 @@ export class ProductCatalogService {
     if (existing) {
       throw new ConflictException("Ya existe un registro con ese nombre dentro del mismo tipo.")
     }
+  }
+
+  private async syncCategoryByName(name: string): Promise<void> {
+    const normalized = name.trim()
+    if (!normalized) return
+
+    const existing = await this.categoryRepository.findOne({ where: { name: ILike(normalized) } })
+    if (!existing) {
+      await this.categoryRepository.save(this.categoryRepository.create({ name: normalized }))
+    }
+  }
+
+  private async syncCategoryRename(previousName: string | undefined, nextName: string): Promise<void> {
+    const normalizedNext = nextName.trim()
+    if (!normalizedNext) return
+
+    const existingTarget = await this.categoryRepository.findOne({ where: { name: ILike(normalizedNext) } })
+    if (existingTarget) {
+      return
+    }
+
+    if (previousName?.trim()) {
+      const previousCategory = await this.categoryRepository.findOne({ where: { name: ILike(previousName.trim()) } })
+      if (previousCategory) {
+        previousCategory.name = normalizedNext
+        await this.categoryRepository.save(previousCategory)
+        return
+      }
+    }
+
+    await this.categoryRepository.save(this.categoryRepository.create({ name: normalizedNext }))
   }
 }
