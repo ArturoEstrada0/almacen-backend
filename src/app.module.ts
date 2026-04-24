@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config"
 import { TypeOrmModule } from "@nestjs/typeorm"
 import { ProductsModule } from "./modules/products/products.module"
 import { CategoriesModule } from "./modules/categories/categories.module"
+import { ProductCatalogModule } from "./modules/product-catalog/product-catalog.module"
 import { UnitsModule } from "./modules/units/units.module"
 import { InventoryModule } from "./modules/inventory/inventory.module"
 import { WarehousesModule } from "./modules/warehouses/warehouses.module"
@@ -79,6 +80,7 @@ import { AccountingModule } from "./modules/accounting/accounting.module"
     TraceabilityModule,
     AccountingModule,
     ProductsModule,
+    ProductCatalogModule,
     CategoriesModule,
     UnitsModule,
     InventoryModule,

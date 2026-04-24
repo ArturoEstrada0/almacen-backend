@@ -28,11 +28,11 @@ export class Product {
   description: string
 
   @Column({
-    type: "enum",
-    enum: ["insumo", "fruta"],
-    default: "insumo",
+    type: "varchar",
+    length: 100,
+    default: "Insumo",
   })
-  type: "insumo" | "fruta"
+  type: string
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   cost: number

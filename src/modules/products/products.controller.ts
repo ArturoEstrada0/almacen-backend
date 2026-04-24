@@ -23,7 +23,7 @@ export class ProductsController {
   @ApiOperation({ summary: "Obtener todos los productos" })
   @ApiResponse({ status: 200, description: "Lista de productos" })
   findAll(
-    @Query('type') type?: 'insumo' | 'fruta',
+    @Query('type') type?: string,
     @Query('categoryId') categoryId?: string,
     @Query('active') active?: boolean,
     @Query('search') search?: string,

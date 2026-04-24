@@ -42,7 +42,7 @@ export class ProductsService {
   }
 
   async findAll(filters?: {
-    type?: "insumo" | "fruta"
+    type?: string
     categoryId?: string
     active?: boolean
     search?: string
