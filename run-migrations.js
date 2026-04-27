@@ -48,6 +48,18 @@ async function runMigrations() {
     await client.query(inventoryFieldsSQL);
     console.log('✅ inventory fields migration completed');
 
+    // Run product catalog migration
+    console.log('\n📝 Running product catalog migration...');
+    const productCatalogSQL = fs.readFileSync(path.join(__dirname, 'migration_add_product_catalog.sql'), 'utf8');
+    await client.query(productCatalogSQL);
+    console.log('✅ product catalog migration completed');
+
+    // Run product type migration
+    console.log('\n📝 Running product type migration...');
+    const productTypeSQL = fs.readFileSync(path.join(__dirname, 'migration_update_product_type_to_varchar.sql'), 'utf8');
+    await client.query(productTypeSQL);
+    console.log('✅ product type migration completed');
+
     console.log('\n🎉 All migrations completed successfully!');
   } catch (error) {
     console.error('❌ Migration failed:', error.message);

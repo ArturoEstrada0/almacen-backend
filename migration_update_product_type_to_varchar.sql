@@ -1,0 +1,9 @@
+ALTER TABLE products
+  ALTER COLUMN type DROP DEFAULT;
+
+ALTER TABLE products
+  ALTER COLUMN type TYPE VARCHAR(100)
+  USING type::text;
+
+ALTER TABLE products
+  ALTER COLUMN type SET DEFAULT 'Insumo';

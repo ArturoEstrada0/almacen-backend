@@ -6,6 +6,7 @@ import { ProductSupplier } from "./entities/product-supplier.entity"
 import { InventoryItem } from "../inventory/entities/inventory-item.entity"
 import type { CreateProductDto } from "./dto/create-product.dto"
 import type { UpdateProductDto } from "./dto/update-product.dto"
+import type { AddProductSupplierDto, UpdateProductSupplierDto } from "./dto/add-product-supplier.dto"
 
 @Injectable()
 export class ProductsService {
@@ -42,10 +43,11 @@ export class ProductsService {
   }
 
   async findAll(filters?: {
-    type?: "insumo" | "fruta"
+    type?: string
     categoryId?: string
     active?: boolean
     search?: string
+    supplierId?: string
   }): Promise<Product[]> {
     const query = this.productsRepository
       .createQueryBuilder("product")
@@ -70,6 +72,10 @@ export class ProductsService {
       query.andWhere("(product.name ILIKE :search OR product.sku ILIKE :search OR product.description ILIKE :search)", {
         search: `%${filters.search}%`,
       })
+    }
+
+    if (filters?.supplierId) {
+      query.andWhere("productSuppliers.supplierId = :supplierId", { supplierId: filters.supplierId })
     }
 
   // Ordenar primero por SKU (ASC) y luego por nombre (A-Z)
@@ -163,12 +169,57 @@ export class ProductsService {
     await this.productsRepository.remove(product)
   }
 
-  async addSupplier(productId: string, supplierData: any): Promise<ProductSupplier> {
+  async addSupplier(productId: string, dto: AddProductSupplierDto): Promise<ProductSupplier> {
+    await this.findOne(productId)
+
+    const existing = await this.productSuppliersRepository.findOne({
+      where: { productId, supplierId: dto.supplierId },
+    })
+    if (existing) {
+      throw new ConflictException("El proveedor ya está asociado a este producto. Use la edición para actualizar sus datos.")
+    }
+
+    if (dto.preferred) {
+      await this.productSuppliersRepository.update({ productId }, { preferred: false })
+    }
+
     const productSupplier = this.productSuppliersRepository.create({
       productId,
-      ...supplierData,
-    } as any)
-    return await this.productSuppliersRepository.save(productSupplier as any)
+      supplierId: dto.supplierId,
+      price: dto.price,
+      supplierSku: dto.supplierSku,
+      leadTimeDays: dto.leadTimeDays ?? 0,
+      minimumOrder: dto.minimumOrder ?? 1,
+      preferred: dto.preferred ?? false,
+    })
+    return await this.productSuppliersRepository.save(productSupplier)
+  }
+
+  async updateProductSupplier(productId: string, productSupplierId: string, dto: UpdateProductSupplierDto): Promise<ProductSupplier> {
+    const relation = await this.productSuppliersRepository.findOne({
+      where: { id: productSupplierId, productId },
+      relations: ["supplier"],
+    })
+    if (!relation) {
+      throw new NotFoundException("Relación producto-proveedor no encontrada.")
+    }
+
+    if (dto.preferred === true) {
+      await this.productSuppliersRepository.update({ productId }, { preferred: false })
+    }
+
+    Object.assign(relation, dto)
+    return await this.productSuppliersRepository.save(relation)
+  }
+
+  async removeSupplier(productId: string, productSupplierId: string): Promise<void> {
+    const relation = await this.productSuppliersRepository.findOne({
+      where: { id: productSupplierId, productId },
+    })
+    if (!relation) {
+      throw new NotFoundException("Relación producto-proveedor no encontrada.")
+    }
+    await this.productSuppliersRepository.remove(relation)
   }
 
   async getSuppliers(productId: string): Promise<ProductSupplier[]> {

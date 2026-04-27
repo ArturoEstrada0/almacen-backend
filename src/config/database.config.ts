@@ -12,11 +12,17 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
     if (usePostgres) {
       // If a full DATABASE_URL is provided (e.g. from Supabase), use it.
       if (process.env.DATABASE_URL) {
+        const poolMax = Number(process.env.DB_POOL_MAX || 2)
         return {
           type: 'postgres',
           url: process.env.DATABASE_URL,
           // Ensure SSL is used in production environments (useful for managed Postgres like Supabase)
           ssl: process.env.NODE_ENV === 'production' || process.env.DB_FORCE_SSL ? { rejectUnauthorized: false } : false,
+          extra: {
+            max: poolMax,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 10000,
+          },
           entities: [__dirname + '/../**/*.entity{.ts,.js}'],
           synchronize: process.env.NODE_ENV !== 'production',
           logging: process.env.NODE_ENV === 'development',
@@ -30,6 +36,11 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_DATABASE || 'almacen',
+        extra: {
+          max: Number(process.env.DB_POOL_MAX || 2),
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 10000,
+        },
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
         synchronize: process.env.NODE_ENV !== 'production',
         logging: process.env.NODE_ENV === 'development',

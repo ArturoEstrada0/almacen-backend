@@ -8,6 +8,7 @@ import type { CreateSupplierDto } from "./dto/create-supplier.dto"
 import { SUPPLIER_TYPES } from "./dto/create-supplier.dto"
 import { TraceabilityService } from "../traceability/traceability.service"
 import type { UpdateSupplierDto } from "./dto/update-supplier.dto"
+import { ProductSupplier } from "../products/entities/product-supplier.entity"
 
 @Injectable()
 export class SuppliersService {
@@ -16,6 +17,7 @@ export class SuppliersService {
 
   constructor(
     @InjectRepository(Supplier) suppliersRepository: Repository<Supplier>,
+    @InjectRepository(ProductSupplier) private productSuppliersRepository: Repository<ProductSupplier>,
     private dataSource: DataSource,
     private traceabilityService: TraceabilityService,
   ) {
@@ -105,6 +107,14 @@ export class SuppliersService {
     }
 
     return await this.suppliersRepository.save(supplier)
+  }
+
+  async getProducts(supplierId: string): Promise<ProductSupplier[]> {
+    await this.findOne(supplierId)
+    return await this.productSuppliersRepository.find({
+      where: { supplierId },
+      relations: ["product", "product.category", "product.unit"],
+    })
   }
 
   async remove(id: string, req?: Request): Promise<void> {
