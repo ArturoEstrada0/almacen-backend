@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import type { Repository } from "typeorm"
-import { DataSource } from "typeorm"
+import { DataSource, In } from "typeorm"
 import { PurchaseOrder } from "./entities/purchase-order.entity"
 import { PurchaseOrderItem } from "./entities/purchase-order-item.entity"
 import { PurchaseOrderPayment } from "./entities/purchase-order-payment.entity"
@@ -10,6 +10,7 @@ import { type RegisterPaymentDto } from "./dto/register-payment.dto"
 import { InventoryService } from "../inventory/inventory.service"
 import { MovementType } from "../inventory/dto/create-movement.dto"
 import { TraceabilityService } from "../traceability/traceability.service"
+import { Product } from "../products/entities/product.entity"
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -37,10 +38,55 @@ export class PurchaseOrdersService {
     private purchaseOrderItemsRepository: Repository<PurchaseOrderItem>,
     @InjectRepository(PurchaseOrderPayment)
     private purchaseOrderPaymentsRepository: Repository<PurchaseOrderPayment>,
+    @InjectRepository(Product)
+    private productsRepository: Repository<Product>,
     private inventoryService: InventoryService,
     private dataSource: DataSource,
     private traceabilityService: TraceabilityService,
   ) {}
+
+  private roundCurrency(value: number): number {
+    return Number((Number(value) || 0).toFixed(2))
+  }
+
+  private async calculateTotalsByProductIva(
+    items: Array<{ productId: string; quantity: number; unitPrice: number }>,
+    manager: any,
+  ): Promise<{ subtotal: number; tax: number; total: number }> {
+    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean)))
+
+    const productRepo: Repository<Product> = manager?.getRepository
+      ? manager.getRepository(Product)
+      : this.productsRepository
+
+    const products = productIds.length
+      ? await productRepo.find({
+          where: { id: In(productIds) } as any,
+        })
+      : []
+
+    const hasIvaMap = new Map<string, boolean>(
+      products.map((product: any) => [product.id, product.hasIva16 !== false]),
+    )
+
+    let subtotal = 0
+    let tax = 0
+
+    for (const item of items) {
+      const lineSubtotal = Number(item.quantity) * Number(item.unitPrice)
+      subtotal += lineSubtotal
+      const appliesIva = hasIvaMap.has(item.productId) ? hasIvaMap.get(item.productId) : true
+      if (appliesIva) {
+        tax += lineSubtotal * 0.16
+      }
+    }
+
+    subtotal = this.roundCurrency(subtotal)
+    tax = this.roundCurrency(tax)
+    const total = this.roundCurrency(subtotal + tax)
+
+    return { subtotal, tax, total }
+  }
 
   async create(createPurchaseOrderDto: CreatePurchaseOrderDto, req?: any): Promise<PurchaseOrder> {
     const queryRunner = this.dataSource.createQueryRunner()
@@ -48,9 +94,6 @@ export class PurchaseOrdersService {
     await queryRunner.startTransaction()
 
     try {
-      // Calculate total
-      const total = createPurchaseOrderDto.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
-
       // Ensure required fields and defaults
       const generatedCode = (createPurchaseOrderDto as any).orderNumber || `OC-${Date.now()}`
       const orderDate = new Date()
@@ -68,7 +111,9 @@ export class PurchaseOrdersService {
         code: generatedCode,
         date: orderDate,
         status: "pendiente",
-        total,
+        subtotal: 0,
+        tax: 0,
+        total: 0,
         paymentTerms: creditDays,
         dueDate,
       } as any)
@@ -84,8 +129,10 @@ export class PurchaseOrdersService {
         })}`,
       )
 
-  // Validate items & Create items (use the original dto items array)
-  for (const itemDto of (dtoItems || [])) {
+    const normalizedItems: Array<{ productId: string; quantity: number; unitPrice: number; notes?: string }> = []
+
+    // Validate items & Create items (use the original dto items array)
+    for (const itemDto of (dtoItems || [])) {
         // Accept several possible field names and coerce to number
         const rawPrice = (itemDto as any).unitPrice ?? (itemDto as any).price ?? (itemDto as any).unit_price
         const price = Number(rawPrice)
@@ -101,17 +148,45 @@ export class PurchaseOrdersService {
           throw new BadRequestException(`Missing or invalid quantity for product ${itemDto?.productId}`)
         }
 
+        normalizedItems.push({
+          productId: itemDto.productId,
+          quantity: qty,
+          unitPrice: price,
+          notes: itemDto.notes,
+        })
+
+      }
+
+      const totals = await this.calculateTotalsByProductIva(
+        normalizedItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+        queryRunner.manager,
+      )
+
+      await queryRunner.manager.update(PurchaseOrder, (purchaseOrder as any).id, {
+        subtotal: totals.subtotal,
+        tax: totals.tax,
+        total: totals.total,
+      } as any)
+
+      for (const normalizedItem of normalizedItems) {
+        const price = normalizedItem.unitPrice
+        const qty = normalizedItem.quantity
+
         // Build a plain object and insert explicitly. Using strings for DECIMAL
         // fields avoids precision/parameterization issues with some drivers.
         const plainItem = {
           purchaseOrderId: (purchaseOrder as any).id,
-          productId: itemDto.productId,
+          productId: normalizedItem.productId,
           quantity: qty,
           receivedQuantity: 0,
           // Store as strings with 2 decimals to match DECIMAL columns
           price: price.toFixed(2),
           total: (qty * price).toFixed(2),
-          notes: itemDto.notes,
+          notes: normalizedItem.notes,
         } as any
 
         // Extra debug logging to capture the exact payload sent to the DB
@@ -199,12 +274,24 @@ export class PurchaseOrdersService {
         // Delete existing items
         await queryRunner.query(`DELETE FROM purchase_order_items WHERE purchase_order_id = $1`, [id])
 
-        let total = 0
+        const normalizedItems: Array<{ productId: string; quantity: number; unitPrice: number; notes?: string }> = []
+
         for (const item of updateDto.items) {
-          const price = Number(item.unitPrice || item.price || 0)
-          const qty = Number(item.quantity || 0)
+          const price = Number(item.unitPrice ?? item.price ?? 0)
+          const qty = Number(item.quantity ?? 0)
+
+          if (!Number.isFinite(price) || !Number.isFinite(qty) || qty <= 0) {
+            throw new BadRequestException(`Ítem inválido para producto ${item?.productId}`)
+          }
+
+          normalizedItems.push({
+            productId: item.productId,
+            quantity: qty,
+            unitPrice: price,
+            notes: item.notes,
+          })
+
           const itemTotal = (qty * price) || 0
-          total += itemTotal
 
           await queryRunner.query(
             `INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, received_quantity, price, total, notes) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -212,7 +299,18 @@ export class PurchaseOrdersService {
           )
         }
 
-        fieldsToUpdate.total = total
+        const totals = await this.calculateTotalsByProductIva(
+          normalizedItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          })),
+          queryRunner.manager,
+        )
+
+        fieldsToUpdate.subtotal = totals.subtotal
+        fieldsToUpdate.tax = totals.tax
+        fieldsToUpdate.total = totals.total
       }
 
       if (Object.keys(fieldsToUpdate).length > 0) {
@@ -360,6 +458,46 @@ export class PurchaseOrdersService {
         pendingAmount: pending,
       }
     })
+  }
+
+  async findPayments(opts?: { supplierId?: string; startDate?: string; endDate?: string; status?: string }): Promise<any[]> {
+    const qb = this.purchaseOrderPaymentsRepository.createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.purchaseOrder', 'po')
+      .leftJoinAndSelect('po.supplier', 'supplier')
+      .orderBy('payment.payment_date', 'DESC')
+
+    if (opts?.supplierId) {
+      qb.andWhere('po.supplier_id = :supplierId', { supplierId: opts.supplierId })
+    }
+
+    if (opts?.startDate) {
+      qb.andWhere('payment.payment_date >= :startDate', { startDate: opts.startDate })
+    }
+
+    if (opts?.endDate) {
+      qb.andWhere('payment.payment_date <= :endDate', { endDate: opts.endDate })
+    }
+
+    if (opts?.status) {
+      qb.andWhere('po.payment_status = :status', { status: opts.status })
+    }
+
+    const payments = await qb.getMany()
+
+    return payments.map((p: any) => ({
+      id: p.id,
+      purchaseOrderId: p.purchaseOrderId,
+      purchaseOrderCode: p.purchaseOrder?.code || null,
+      supplierId: p.purchaseOrder?.supplierId || null,
+      supplierName: p.purchaseOrder?.supplier ? (p.purchaseOrder.supplier.name || p.purchaseOrder.supplier.companyName) : null,
+      paymentDate: p.paymentDate,
+      amount: Number(p.amount),
+      reference: p.reference,
+      notes: p.notes,
+      invoiceFileUrl: p.invoiceFileUrl,
+      createdAt: p.createdAt,
+      purchaseOrderStatus: p.purchaseOrder?.paymentStatus || p.purchaseOrder?.status || null,
+    }))
   }
 
   async receive(id: string, itemId: string, quantity: number): Promise<PurchaseOrder> {

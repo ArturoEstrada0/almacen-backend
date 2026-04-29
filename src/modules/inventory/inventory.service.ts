@@ -25,6 +25,18 @@ export class InventoryService {
     private dataSource: DataSource,
   ) {}
 
+  private normalizeType(value: string | null | undefined) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+  }
+
+  private isSameType(left: string | null | undefined, right: string | null | undefined) {
+    return this.normalizeType(left) === this.normalizeType(right)
+  }
+
   async getInventory(warehouseId?: string) {
     const where = warehouseId ? { warehouseId } : {}
     return await this.inventoryRepository.find({
@@ -75,13 +87,13 @@ export class InventoryService {
         throw new BadRequestException(`Product ${itemDto.productId} not found`)
       }
 
-      if (sourceWarehouse.type !== product.type) {
+      if (!this.isSameType(sourceWarehouse.type, product.type)) {
         throw new BadRequestException(
           `Product ${product.name} (${product.type}) is not allowed in warehouse ${sourceWarehouse.name} (${sourceWarehouse.type})`,
         )
       }
 
-      if (destinationWarehouse && destinationWarehouse.type !== product.type) {
+      if (destinationWarehouse && !this.isSameType(destinationWarehouse.type, product.type)) {
         throw new BadRequestException(
           `Product ${product.name} (${product.type}) is not allowed in destination warehouse ${destinationWarehouse.name} (${destinationWarehouse.type})`,
         )
@@ -109,7 +121,7 @@ export class InventoryService {
       if (!src.active) throw new BadRequestException(`Source warehouse ${createMovementDto.warehouseId} is not active`)
       if (!dest.active) throw new BadRequestException(`Destination warehouse ${createMovementDto.destinationWarehouseId} is not active`)
 
-      if (src.type !== dest.type) {
+      if (!this.isSameType(src.type, dest.type)) {
         throw new BadRequestException("Source and destination warehouse types must match for traspaso")
       }
 
@@ -315,7 +327,7 @@ export class InventoryService {
       throw new BadRequestException(`Product ${productId} not found`)
     }
 
-    if (warehouse.type !== product.type) {
+    if (!this.isSameType(warehouse.type, product.type)) {
       throw new BadRequestException(
         `Product ${product.name} (${product.type}) is not allowed in warehouse ${warehouse.name} (${warehouse.type})`,
       )

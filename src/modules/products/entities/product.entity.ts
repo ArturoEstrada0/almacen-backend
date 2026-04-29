@@ -46,6 +46,9 @@ export class Product {
   @Column({ nullable: true })
   barcode: string
 
+  @Column({ name: "has_iva_16", default: true })
+  hasIva16: boolean
+
   @Column({ default: true })
   active: boolean
 
