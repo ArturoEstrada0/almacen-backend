@@ -7,9 +7,10 @@ import { PurchaseOrderItem } from "./entities/purchase-order-item.entity"
 import { PurchaseOrderPayment } from "./entities/purchase-order-payment.entity"
 import { InventoryModule } from "../inventory/inventory.module"
 import { TraceabilityModule } from "../traceability/traceability.module"
+import { Product } from "../products/entities/product.entity"
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment]), InventoryModule, TraceabilityModule],
+  imports: [TypeOrmModule.forFeature([PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Product]), InventoryModule, TraceabilityModule],
   controllers: [PurchaseOrdersController],
   providers: [PurchaseOrdersService],
   exports: [PurchaseOrdersService],

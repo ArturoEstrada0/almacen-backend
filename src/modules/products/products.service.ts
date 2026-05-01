@@ -96,12 +96,15 @@ export class ProductsService {
       throw new NotFoundException(`No se encontró el producto solicitado.`)
     }
 
+    console.log('📖 [findOne] Producto obtenido:', { id: product.id, hasIva16: product.hasIva16, categoryId: product.categoryId })
     return product
   }
 
   async update(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
     try {
       const product = await this.findOne(id)
+      
+      console.log('🔧 [update] DTO recibido:', JSON.stringify(updateProductDto, null, 2))
       
       // Si se está actualizando el SKU, verificar que no exista otro producto con ese SKU
       if (updateProductDto.sku && updateProductDto.sku !== product.sku) {
@@ -118,7 +121,22 @@ export class ProductsService {
       const { currentStock, warehouseId, ...productData } = updateProductDto
       
       Object.assign(product, productData)
-      const updatedProduct = await this.productsRepository.save(product)
+
+      // Asegurar que la relación de categoría no se quede con la entidad anterior cargada
+      if (updateProductDto.categoryId !== undefined) {
+        const categoryId = updateProductDto.categoryId || null
+        product.categoryId = categoryId
+        product.category = categoryId ? ({ id: categoryId } as any) : null
+      }
+
+      // Asegurar explícitamente que hasIva16 se guarde
+      if (updateProductDto.hasIva16 !== undefined) {
+        product.hasIva16 = updateProductDto.hasIva16
+      }
+
+      console.log('💾 [update] Producto antes de guardar:', { id: product.id, hasIva16: product.hasIva16, categoryId: product.categoryId })
+      await this.productsRepository.save(product)
+      console.log('✅ [update] Producto guardado con ID:', id)
       
       // Si se proporciona currentStock, actualizar el inventario
       if (currentStock !== undefined && warehouseId) {
@@ -143,6 +161,9 @@ export class ProductsService {
         await this.inventoryRepository.save(inventoryItem)
       }
       
+      // Re-fetch con relaciones cargadas para devolver respuesta completa
+      const updatedProduct = await this.findOne(id)
+      console.log('✅ [update] Producto devuelto con relaciones:', { id: updatedProduct.id, hasIva16: updatedProduct.hasIva16, categoryId: updatedProduct.categoryId, categoryName: updatedProduct.category?.name })
       return updatedProduct
     } catch (error) {
       // Re-lanzar excepciones conocidas de NestJS

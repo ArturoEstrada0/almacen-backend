@@ -140,6 +140,16 @@ async function ensureCustomerReceivablesSchema(dataSource: DataSource) {
   }
 }
 
+async function ensureProductsSchema(dataSource: DataSource) {
+  try {
+    await dataSource.query(`ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS has_iva_16 BOOLEAN NOT NULL DEFAULT true;
+    `)
+  } catch (err) {
+    console.warn('Product schema could not be fully initialized:', err?.message || err)
+  }
+}
+
 async function bootstrap() {
   // Force DNS to prefer IPv4 addresses first to avoid ENETUNREACH when the
   // environment/container has no IPv6 connectivity (common on some PaaS).
@@ -214,6 +224,12 @@ async function bootstrap() {
     await ensureCustomerSchema(app.get(DataSource))
   } catch (err) {
     console.warn('Could not ensure customer schema:', err?.message || err)
+  }
+
+  try {
+    await ensureProductsSchema(app.get(DataSource))
+  } catch (err) {
+    console.warn('Could not ensure product schema:', err?.message || err)
   }
 
   // Serve uploaded files under /uploads

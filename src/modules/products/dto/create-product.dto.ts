@@ -58,4 +58,9 @@ export class CreateProductDto {
   @IsBoolean()
   @IsOptional()
   active?: boolean
+
+  @ApiPropertyOptional({ default: true, description: "Indica si al producto se le aplica IVA del 16% en órdenes de compra" })
+  @IsBoolean()
+  @IsOptional()
+  hasIva16?: boolean
 }

@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Param, Patch, ParseUUIDPipe, Req, Query, UseInterceptors, UploadedFile } from "@nestjs/common"
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from "@nestjs/swagger"
+import { Controller, Get, Post, Body, Param, Patch, ParseUUIDPipe, Req, Query, UseInterceptors, UploadedFile, UseGuards } from "@nestjs/common"
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth } from "@nestjs/swagger"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { PurchaseOrdersService } from "./purchase-orders.service"
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto"
@@ -8,6 +8,9 @@ import { UpdatePurchaseOrderDto } from "./dto/update-purchase-order.dto"
 import type { Request } from 'express'
 import * as multer from "multer"
 import { createClient } from "@supabase/supabase-js"
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
+import { RolesGuard } from "../auth/guards/roles.guard"
+import { Roles } from "../auth/decorators/roles.decorator"
 
 async function ensureStorageBucket(supabase: any, bucket: string) {
   const { data: existing, error } = await supabase.storage.getBucket(bucket)
@@ -78,6 +81,21 @@ export class PurchaseOrdersController {
   @ApiResponse({ status: 200, description: "List of purchase orders" })
   findAll(@Query('supplierId') supplierId?: string) {
     return this.purchaseOrdersService.findAll(supplierId)
+  }
+
+  @Get('payments')
+  @ApiOperation({ summary: 'Get payments history' })
+  @ApiResponse({ status: 200, description: 'List of payments' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'manager')
+  findPayments(
+    @Query('supplierId') supplierId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.purchaseOrdersService.findPayments({ supplierId, startDate, endDate, status })
   }
 
   @Get('pending')
