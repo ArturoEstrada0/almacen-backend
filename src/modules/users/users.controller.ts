@@ -8,6 +8,7 @@ import {
   Delete,
   ParseUUIDPipe,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -22,6 +23,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('current/me')
+  @ApiOperation({ summary: 'Obtener el usuario actual' })
+  @ApiResponse({ status: 200, description: 'Usuario actual encontrado' })
+  getCurrentUser(@Req() req: Request) {
+    return this.usersService.findByEmail((req as any).user?.email);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Obtener todos los usuarios' })

@@ -75,6 +75,35 @@ export class UsersService {
     };
   }
 
+  async findByEmail(email?: string) {
+    if (!email) {
+      throw new NotFoundException('Email no proporcionado');
+    }
+
+    const { data, error } = await this.supabase.auth.admin.listUsers();
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    const user = data.users.find((u: SupabaseUser) => u.email === email) as SupabaseUser;
+
+    if (!user) {
+      throw new NotFoundException(`Usuario con email ${email} no encontrado`);
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.user_metadata?.full_name || user.email,
+      role: user.user_metadata?.role || 'viewer',
+      permissions: user.user_metadata?.permissions || DEFAULT_PERMISSIONS[user.user_metadata?.role || 'viewer'],
+      isActive: !user.banned_until,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+    };
+  }
+
   async create(createUserDto: CreateUserDto) {
     // Si no se proporcionan permisos personalizados, usar los permisos por defecto del rol
     const permissions = createUserDto.permissions || DEFAULT_PERMISSIONS[createUserDto.role];

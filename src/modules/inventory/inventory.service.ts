@@ -136,34 +136,38 @@ export class InventoryService {
         }
       }
     }
-    const queryRunner = this.dataSource.createQueryRunner()
-    await queryRunner.connect()
-    await queryRunner.startTransaction()
+
+    const shouldCreateQueryRunner = !createMovementDto.queryRunner
+    const queryRunner = createMovementDto.queryRunner || this.dataSource.createQueryRunner()
+
+    if (shouldCreateQueryRunner) {
+      await queryRunner.connect()
+      await queryRunner.startTransaction()
+    }
 
     try {
-        // Create movement - generate a simple unique code to satisfy DB unique constraint
-        const createdMovement = this.movementsRepository.create({
-          code: `MV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          type: createMovementDto.type,
-          warehouseId: createMovementDto.warehouseId,
-          destinationWarehouseId: createMovementDto.destinationWarehouseId,
-          // map optional fields if present
-          referenceType: (createMovementDto as any).referenceType || undefined,
-          referenceId: (createMovementDto as any).referenceId || undefined,
-          notes: createMovementDto.notes,
-        } as any)
+      // Create movement - generate a simple unique code to satisfy DB unique constraint
+      const createdMovement = this.movementsRepository.create({
+        code: `MV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type: createMovementDto.type,
+        warehouseId: createMovementDto.warehouseId,
+        destinationWarehouseId: createMovementDto.destinationWarehouseId,
+        referenceType: (createMovementDto as any).referenceType || undefined,
+        referenceId: (createMovementDto as any).referenceId || undefined,
+        createdBy: (createMovementDto as any).createdBy || undefined,
+        notes: createMovementDto.notes,
+      } as any)
       await queryRunner.manager.save(createdMovement)
 
       // Process each item
       for (const itemDto of createMovementDto.items) {
-        // Create movement item
-          const movementItem = this.movementItemsRepository.create({
-            movementId: (createdMovement as any).id,
-            productId: itemDto.productId,
-            quantity: itemDto.quantity,
-            locationId: itemDto.locationId,
-            notes: itemDto.notes,
-          } as any)
+        const movementItem = this.movementItemsRepository.create({
+          movementId: (createdMovement as any).id,
+          productId: itemDto.productId,
+          quantity: itemDto.quantity,
+          cost: itemDto.cost || null,
+          notes: itemDto.notes,
+        } as any)
         await queryRunner.manager.save(movementItem)
 
         // Update inventory based on movement type
@@ -178,18 +182,24 @@ export class InventoryService {
         )
       }
 
-      await queryRunner.commitTransaction()
+      if (shouldCreateQueryRunner) {
+        await queryRunner.commitTransaction()
+      }
 
       // Return movement with relations
-        return await this.movementsRepository.findOne({
+      return await this.movementsRepository.findOne({
         where: { id: (createdMovement as any).id },
         relations: ["items", "items.product", "warehouse", "destinationWarehouse"],
       })
     } catch (error) {
-      await queryRunner.rollbackTransaction()
+      if (shouldCreateQueryRunner && queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction()
+      }
       throw error
     } finally {
-      await queryRunner.release()
+      if (shouldCreateQueryRunner) {
+        await queryRunner.release()
+      }
     }
   }
 
@@ -282,11 +292,17 @@ export class InventoryService {
 
   async getMovements(warehouseId?: string) {
     const where = warehouseId ? { warehouseId } : {}
-    return await this.movementsRepository.find({
+    const movements = await this.movementsRepository.find({
       where,
       relations: ["items", "items.product", "warehouse", "destinationWarehouse"],
       order: { createdAt: "DESC" },
     })
+
+    // Map createdBy to userName for API response
+    return movements.map((m: any) => ({
+      ...m,
+      userName: m.createdBy,
+    }))
   }
 
   async getMovement(id: string) {
@@ -299,7 +315,11 @@ export class InventoryService {
       throw new NotFoundException(`Movement with ID ${id} not found`)
     }
 
-    return movement
+    // Map createdBy to userName for API response
+    return {
+      ...movement,
+      userName: (movement as any).createdBy,
+    }
   }
 
   async updateInventorySettings(productId: string, body: { 

@@ -122,9 +122,9 @@ export class PurchaseOrdersController {
   receive(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
-    @Body('quantity') quantity: number,
+    @Body() body: any,
   ) {
-    return this.purchaseOrdersService.receive(id, itemId, quantity)
+    return this.purchaseOrdersService.receive(id, itemId, body.quantity, body.userName)
   }
 
   @Patch(':id/cancel')

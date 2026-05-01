@@ -500,10 +500,13 @@ export class PurchaseOrdersService {
     }))
   }
 
-  async receive(id: string, itemId: string, quantity: number): Promise<PurchaseOrder> {
+  async receive(id: string, itemId: string, quantity: number, userName?: string): Promise<PurchaseOrder> {
     const queryRunner = this.dataSource.createQueryRunner()
     await queryRunner.connect()
     await queryRunner.startTransaction()
+
+    // Use provided userName or default to "sistema"
+    const createdByUser = userName || "sistema"
 
     try {
       // Load entity for mutation
@@ -524,15 +527,19 @@ export class PurchaseOrdersService {
       await this.inventoryService.createMovement({
         type: MovementType.ENTRADA,
         warehouseId: (purchaseOrder as any).warehouseId,
-        reference: `PO-${(purchaseOrder as any).code}`,
+        referenceType: "PO",
+        referenceId: id,
         notes: `Recepción de orden de compra ${(purchaseOrder as any).code}`,
         items: [
           {
             productId: item.productId,
             quantity,
+            cost: Number(item.price),
           },
         ],
-      })
+        queryRunner,
+        createdBy: createdByUser,
+      } as any)
 
       // Update purchase order status
   // Coerce numeric comparisons to avoid string/decimal pitfalls from the driver

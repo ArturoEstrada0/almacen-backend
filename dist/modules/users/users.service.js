@@ -62,6 +62,29 @@ let UsersService = class UsersService {
             updatedAt: user.updated_at,
         };
     }
+    async findByEmail(email) {
+        if (!email) {
+            throw new common_1.NotFoundException('Email no proporcionado');
+        }
+        const { data, error } = await this.supabase.auth.admin.listUsers();
+        if (error) {
+            throw new common_1.BadRequestException(error.message);
+        }
+        const user = data.users.find((u) => u.email === email);
+        if (!user) {
+            throw new common_1.NotFoundException(`Usuario con email ${email} no encontrado`);
+        }
+        return {
+            id: user.id,
+            email: user.email,
+            fullName: user.user_metadata?.full_name || user.email,
+            role: user.user_metadata?.role || 'viewer',
+            permissions: user.user_metadata?.permissions || user_permissions_dto_1.DEFAULT_PERMISSIONS[user.user_metadata?.role || 'viewer'],
+            isActive: !user.banned_until,
+            createdAt: user.created_at,
+            updatedAt: user.updated_at,
+        };
+    }
     async create(createUserDto) {
         const permissions = createUserDto.permissions || user_permissions_dto_1.DEFAULT_PERMISSIONS[createUserDto.role];
         const { data, error } = await this.supabase.auth.admin.createUser({

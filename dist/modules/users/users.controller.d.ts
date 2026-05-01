@@ -5,6 +5,16 @@ import { UpdatePasswordDto } from './dto/update-password.dto';
 export declare class UsersController {
     private readonly usersService;
     constructor(usersService: UsersService);
+    getCurrentUser(req: Request): Promise<{
+        id: string;
+        email: string;
+        fullName: any;
+        role: any;
+        permissions: any;
+        isActive: boolean;
+        createdAt: string;
+        updatedAt: string;
+    }>;
     findAll(): Promise<{
         id: string;
         email: string;

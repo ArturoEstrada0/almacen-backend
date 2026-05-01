@@ -371,6 +371,7 @@ export class ProducersService {
             productId: item.productId,
             quantity: item.quantity,
           })),
+          queryRunner,
         })
       }
 
@@ -472,6 +473,7 @@ export class ProducersService {
         reference: `Devolución de productor`,
         notes: dto.notes,
         items: dto.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+        queryRunner,
       })
 
       // Create account movement (abono - se acredita al productor)
@@ -714,6 +716,7 @@ export class ProducersService {
             quantity: dto.boxes,
           },
         ],
+        queryRunner,
       })
 
       // NOTA IMPORTANTE: Las cajas asignadas al productor que fueron usadas para empacar la fruta

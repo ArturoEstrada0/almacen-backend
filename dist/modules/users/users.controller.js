@@ -24,6 +24,9 @@ let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
+    getCurrentUser(req) {
+        return this.usersService.findByEmail(req.user?.email);
+    }
     findAll() {
         return this.usersService.findAll();
     }
@@ -47,6 +50,15 @@ let UsersController = class UsersController {
     }
 };
 exports.UsersController = UsersController;
+__decorate([
+    (0, common_1.Get)('current/me'),
+    (0, swagger_1.ApiOperation)({ summary: 'Obtener el usuario actual' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Usuario actual encontrado' }),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Request]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "getCurrentUser", null);
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: 'Obtener todos los usuarios' }),

@@ -35,6 +35,11 @@ export class CreateMovementItemDto {
   @IsOptional()
   locationId?: string
 
+  @ApiProperty({ example: 10.50, required: false })
+  @IsNumber()
+  @IsOptional()
+  cost?: number
+
   @ApiProperty({ example: "Notas adicionales", required: false })
   @IsString()
   @IsOptional()
@@ -72,4 +77,9 @@ export class CreateMovementDto {
   @ValidateNested({ each: true })
   @Type(() => CreateMovementItemDto)
   items: CreateMovementItemDto[]
+
+  referenceType?: string
+  referenceId?: string
+  queryRunner?: any
+  createdBy?: string
 }

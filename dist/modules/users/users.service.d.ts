@@ -25,6 +25,16 @@ export declare class UsersService {
         createdAt: string;
         updatedAt: string;
     }>;
+    findByEmail(email?: string): Promise<{
+        id: string;
+        email: string;
+        fullName: any;
+        role: any;
+        permissions: any;
+        isActive: boolean;
+        createdAt: string;
+        updatedAt: string;
+    }>;
     create(createUserDto: CreateUserDto): Promise<{
         id: string;
         email: string;
